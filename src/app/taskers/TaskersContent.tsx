@@ -27,6 +27,10 @@ type Tasker = {
   avatar_url?: string | null
 }
 
+function isElite(t: Tasker) {
+  return t.verified && t.rating >= 4.8 && (t.tasks_done ?? 0) >= 10
+}
+
 const CATEGORIES = [
   'All', 'Cleaning', 'Moving', 'Tutoring', 'Delivery', 'Handyman', 'Events',
   'IT & Tech', 'Gardening', 'Pet Care', 'Cooking', 'Shopping', 'Knitting',
@@ -107,6 +111,12 @@ function TaskerCard({ tasker, index, bookLabel }: { tasker: Tasker; index: numbe
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-extrabold text-gray-900 text-base">{tasker.display_name}</h3>
+            {isElite(tasker) && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold border"
+                style={{ background: 'linear-gradient(135deg,#fef9c3,#fde68a)', color: '#92400e', borderColor: '#fcd34d' }}>
+                ★ Elite
+              </span>
+            )}
             {tasker.verified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700 border border-green-100">
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>

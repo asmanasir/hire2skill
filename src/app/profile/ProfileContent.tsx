@@ -17,6 +17,8 @@ type Profile = {
   categories: string[] | null
   location: string | null
   verified: boolean
+  verification_status: string | null
+  verification_note: string | null
   tasks_done: number
   rating: number
   avatar_url: string | null
@@ -50,6 +52,7 @@ type RoleType = 'poster' | 'helper'
 
 const TABS = [
   { key: 'profile',       label: 'Profile' },
+  { key: 'verification',  label: 'Verification' },
   { key: 'password',      label: 'Password' },
   { key: 'security',      label: 'Account Security' },
   { key: 'notifications', label: 'Notifications' },
@@ -168,6 +171,111 @@ function TextInput({ value, onChange, placeholder, readOnly, type = 'text' }: {
           ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
           : 'border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
       }`} />
+  )
+}
+
+// ── Verification tab ──────────────────────────────────────────────────────────
+
+function VerificationTab({ profile, userId }: { profile: Profile | null; userId: string }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const status = profile?.verification_status ?? 'unverified'
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!file) return
+    setUploading(true)
+    setError('')
+    const supabase = createClient()
+    const ext = file.name.split('.').pop()
+    const path = `${userId}/${Date.now()}.${ext}`
+    const { error: uploadErr } = await supabase.storage.from('id-documents').upload(path, file, { upsert: true })
+    if (uploadErr) { setError(uploadErr.message); setUploading(false); return }
+    const { error: updateErr } = await supabase.from('profiles').update({
+      verification_status: 'pending',
+      verification_doc_url: path,
+      verification_submitted_at: new Date().toISOString(),
+    }).eq('id', userId)
+    setUploading(false)
+    if (updateErr) { setError(updateErr.message); return }
+    setDone(true)
+  }
+
+  const STATUS_CONFIG: Record<string, { icon: string; color: string; bg: string; border: string; title: string; desc: string }> = {
+    unverified: { icon: '○', color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB', title: 'Not verified', desc: 'Upload a government-issued ID to get your Verified badge.' },
+    pending:    { icon: '⏳', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', title: 'Under review', desc: 'Your document has been submitted and is being reviewed. This usually takes 1–2 business days.' },
+    verified:   { icon: '✓', color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0', title: 'Verified', desc: 'Your identity has been verified. Your profile now shows the Verified badge.' },
+    rejected:   { icon: '✗', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', title: 'Verification rejected', desc: profile?.verification_note ?? 'Your document could not be verified. Please re-submit a clearer image.' },
+  }
+
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.unverified
+
+  return (
+    <div>
+      <SectionTitle title="Identity Verification" />
+      <div className="max-w-lg space-y-6">
+        {/* Status banner */}
+        <div className="flex items-start gap-3 p-4 rounded-xl border" style={{ background: cfg.bg, borderColor: cfg.border }}>
+          <span className="text-lg font-bold mt-0.5" style={{ color: cfg.color }}>{cfg.icon}</span>
+          <div>
+            <p className="text-sm font-bold" style={{ color: cfg.color }}>{cfg.title}</p>
+            <p className="text-sm text-gray-600 mt-0.5">{cfg.desc}</p>
+          </div>
+        </div>
+
+        {/* Upload form — show for unverified + rejected */}
+        {(status === 'unverified' || status === 'rejected') && !done && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-2">Accepted documents</p>
+              <ul className="text-sm text-gray-500 space-y-1 list-disc list-inside">
+                <li>National ID card (front + back)</li>
+                <li>Passport (photo page)</li>
+                <li>Driver's licence</li>
+              </ul>
+            </div>
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors">
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+                className="hidden" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+              {file ? (
+                <p className="text-sm font-semibold text-blue-600">{file.name}</p>
+              ) : (
+                <>
+                  <svg className="mx-auto mb-2" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <p className="text-sm text-gray-500">Click to upload your ID document</p>
+                  <p className="text-xs text-gray-400 mt-1">JPG, PNG, PDF · max 10 MB</p>
+                </>
+              )}
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button type="submit" disabled={!file || uploading}
+              className="px-6 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-opacity"
+              style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
+              {uploading ? 'Uploading…' : 'Submit for verification'}
+            </button>
+          </form>
+        )}
+
+        {done && (
+          <div className="flex items-center gap-2 p-4 rounded-xl bg-green-50 border border-green-100">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <p className="text-sm font-semibold text-green-700">Document submitted — we'll review it within 1–2 business days.</p>
+          </div>
+        )}
+
+        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+          <p className="text-xs text-gray-500">
+            Your document is stored securely and only used to verify your identity. It will not be shared with other users.
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -871,6 +979,11 @@ export default function ProfileContent({
                   <p className="text-xs text-gray-400 mt-1">Your payment history will appear here once payments are enabled.</p>
                 </div>
               </div>
+            )}
+
+            {/* ─── VERIFICATION ─── */}
+            {tab === 'verification' && (
+              <VerificationTab profile={profile} userId={user.id} />
             )}
 
             {/* ─── DELETE ACCOUNT ─── */}

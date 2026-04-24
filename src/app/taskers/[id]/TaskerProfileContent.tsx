@@ -19,6 +19,10 @@ type Tasker = {
   avatar_url?: string | null
 }
 
+function isElite(t: Tasker) {
+  return t.verified && t.rating >= 4.8 && (t.tasks_done ?? 0) >= 10
+}
+
 type Review = {
   author: string
   date: string
@@ -169,6 +173,12 @@ export default function TaskerProfileContent({
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-3 mb-1">
                     <h1 className="text-2xl font-extrabold text-gray-900">{tasker.display_name}</h1>
+                    {isElite(tasker) && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border"
+                        style={{ background: 'linear-gradient(135deg,#fef9c3,#fde68a)', color: '#92400e', borderColor: '#fcd34d' }}>
+                        ★ Elite Helper
+                      </span>
+                    )}
                     {tasker.verified && (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 border border-green-100">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
