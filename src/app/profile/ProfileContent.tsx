@@ -491,7 +491,8 @@ export default function ProfileContent({
                           onChange={e => handleLocationChange(e.target.value)}
                           onFocus={() => location.trim().length >= 1 && setShowLocSuggestions(locSuggestions.length > 0)}
                           placeholder="e.g. Oslo – Grünerløkka"
-                          className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+                          style={{ paddingLeft: '2.25rem' }}
+                          className="w-full rounded-xl border border-gray-200 pr-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
                       </div>
                       {showLocSuggestions && (
                         <ul className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">

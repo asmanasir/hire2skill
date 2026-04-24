@@ -394,7 +394,8 @@ export default function OnboardingForm({ userId, userEmail }: { userId: string; 
                           onChange={e => { handleLocationChange(e.target.value); setFieldErrors(p => ({ ...p, location: undefined })) }}
                           onFocus={() => { if (location.length >= 1) setShowLocSuggestions(locSuggestions.length > 0) }}
                           placeholder="e.g. Oslo"
-                          className={`w-full rounded-xl border pl-9 pr-4 py-3 text-sm focus:outline-none focus:ring-2 transition ${
+                          style={{ paddingLeft: '2.25rem' }}
+                          className={`w-full rounded-xl border pr-4 py-3 text-sm focus:outline-none focus:ring-2 transition ${
                             fieldErrors.location ? 'border-red-400 focus:ring-red-100' : 'border-gray-200 focus:ring-blue-300 focus:border-blue-400'
                           }`}
                         />

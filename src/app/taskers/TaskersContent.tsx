@@ -1,11 +1,11 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/context/LanguageContext'
 import {
+  Search, X,
   SprayCan, Truck, GraduationCap, Package, Wrench, PartyPopper, Monitor, Leaf,
   PawPrint, ChefHat, ShoppingBag, Wind, Scissors, Baby, Car, PaintBucket,
   Paintbrush, Wand2, Snowflake, Dog, Sofa, AppWindow, Camera, Dumbbell,
@@ -22,6 +22,7 @@ type Tasker = {
   verified: boolean
   tasks_done: number
   rating: number
+  review_count?: number
   response_hours: number
   avatar_url?: string | null
 }
@@ -66,6 +67,15 @@ const CAT_ICONS: Record<string, CatMeta> = {
 
 const AVATAR_COLORS = ['#2563EB', '#16A34A', '#7C3AED', '#D97706', '#E11D48', '#0284C7', '#EA580C', '#0F766E']
 
+const SORT_OPTIONS = [
+  { value: 'recommended',  label: 'Recommended' },
+  { value: 'price_asc',    label: 'Price: Low → High' },
+  { value: 'price_desc',   label: 'Price: High → Low' },
+  { value: 'most_reviews', label: 'Most reviews' },
+  { value: 'top_rated',    label: 'Highest rated' },
+] as const
+type SortBy = (typeof SORT_OPTIONS)[number]['value']
+
 function Stars({ rating }: { rating: number }) {
   return (
     <span className="flex items-center gap-0.5">
@@ -85,7 +95,6 @@ function TaskerCard({ tasker, index, bookLabel }: { tasker: Tasker; index: numbe
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-blue-400 hover:shadow-xl transition-all duration-200 flex flex-col">
-      {/* Header */}
       <div className="flex items-start gap-4 mb-4">
         {tasker.avatar_url ? (
           <img src={tasker.avatar_url} alt={tasker.display_name} className="h-16 w-16 rounded-2xl object-cover shrink-0" />
@@ -109,8 +118,11 @@ function TaskerCard({ tasker, index, bookLabel }: { tasker: Tasker; index: numbe
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span className="text-xs text-gray-400">{tasker.location}</span>
           </div>
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex items-center gap-2">
             <Stars rating={tasker.rating} />
+            {(tasker.review_count ?? 0) > 0 && (
+              <span className="text-xs text-gray-400">({tasker.review_count} reviews)</span>
+            )}
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -119,18 +131,16 @@ function TaskerCard({ tasker, index, bookLabel }: { tasker: Tasker; index: numbe
         </div>
       </div>
 
-      {/* Bio */}
       <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2">{tasker.bio}</p>
 
-      {/* Stats */}
       <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
         <span className="flex items-center gap-1.5">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          {tasker.tasks_done} tasks done
+          {tasker.tasks_done} tasks
         </span>
         <span className="flex items-center gap-1.5">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          Replies in &lt; {tasker.response_hours}h
+          &lt; {tasker.response_hours}h reply
         </span>
         <div className="flex gap-1 ml-auto">
           {tasker.categories.slice(0, 2).map(c => {
@@ -147,7 +157,6 @@ function TaskerCard({ tasker, index, bookLabel }: { tasker: Tasker; index: numbe
         </div>
       </div>
 
-      {/* Footer */}
       <div className="flex gap-3 mt-auto pt-4 border-t border-gray-100">
         <Link href={`/taskers/${tasker.id}`}
           className="flex-1 rounded-xl py-2.5 text-sm font-bold text-blue-600 border-2 border-blue-600 text-center hover:bg-blue-600 hover:text-white transition-all">
@@ -167,22 +176,83 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
   const { t } = useLanguage()
   const searchParams = useSearchParams()
   const posted = searchParams.get('posted') === '1'
-  const [selected, setSelected] = useState(activeCategory ?? 'All')
+
   const [showBanner, setShowBanner] = useState(posted)
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [category, setCategory] = useState(activeCategory ?? 'All')
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
+  const [location, setLocation] = useState('All')
+  const [minRating, setMinRating] = useState(0)
+  const [maxResponseHours, setMaxResponseHours] = useState(24)
+  const [sortBy, setSortBy] = useState<SortBy>('recommended')
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 280)
+    return () => clearTimeout(id)
+  }, [query])
 
   useEffect(() => {
     if (posted) {
-      const timer = setTimeout(() => setShowBanner(false), 5000)
-      return () => clearTimeout(timer)
+      const id = setTimeout(() => setShowBanner(false), 5000)
+      return () => clearTimeout(id)
     }
   }, [posted])
 
-  const filtered = selected === 'All' ? taskers : taskers.filter(t => t.categories.includes(selected))
+  const locations = useMemo(() => {
+    const set = new Set(taskers.map(t => t.location).filter(Boolean))
+    return ['All', ...Array.from(set).sort()]
+  }, [taskers])
+
+  const hasActiveFilters = !!(debouncedQuery || category !== 'All' || priceMin || priceMax || location !== 'All' || minRating > 0 || maxResponseHours < 24)
+
+  const filtered = useMemo(() => {
+    let list = [...taskers]
+
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase()
+      list = list.filter(t =>
+        t.display_name.toLowerCase().includes(q) ||
+        t.bio.toLowerCase().includes(q) ||
+        t.location.toLowerCase().includes(q) ||
+        t.categories.some(c => c.toLowerCase().includes(q))
+      )
+    }
+
+    if (category !== 'All') list = list.filter(t => t.categories.includes(category))
+    if (priceMin)           list = list.filter(t => t.hourly_rate >= Number(priceMin))
+    if (priceMax)           list = list.filter(t => t.hourly_rate <= Number(priceMax))
+    if (location !== 'All') list = list.filter(t => t.location === location)
+    if (minRating > 0)      list = list.filter(t => t.rating >= minRating)
+    if (maxResponseHours < 24) list = list.filter(t => t.response_hours <= maxResponseHours)
+
+    switch (sortBy) {
+      case 'price_asc':    list.sort((a, b) => a.hourly_rate - b.hourly_rate); break
+      case 'price_desc':   list.sort((a, b) => b.hourly_rate - a.hourly_rate); break
+      case 'most_reviews': list.sort((a, b) => (b.review_count ?? b.tasks_done) - (a.review_count ?? a.tasks_done)); break
+      case 'top_rated':    list.sort((a, b) => b.rating - a.rating); break
+      default:             list.sort((a, b) => (b.rating * 20 + b.tasks_done) - (a.rating * 20 + a.tasks_done))
+    }
+
+    return list
+  }, [taskers, debouncedQuery, category, priceMin, priceMax, location, minRating, maxResponseHours, sortBy])
+
+  function clearAll() {
+    setQuery('')
+    setDebouncedQuery('')
+    setCategory('All')
+    setPriceMin('')
+    setPriceMax('')
+    setLocation('All')
+    setMinRating(0)
+    setMaxResponseHours(24)
+    setSortBy('recommended')
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Success banner after posting */}
       {showBanner && (
         <div className="bg-green-600 text-white px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -190,18 +260,36 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
             <span className="text-sm font-semibold">Your task is posted! Browse helpers below and send a request.</span>
           </div>
           <button onClick={() => setShowBanner(false)} className="text-white/80 hover:text-white">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <X size={16} />
           </button>
         </div>
       )}
 
-      {/* Header */}
+      {/* Header + Search */}
       <div className="bg-white border-b border-gray-200 px-6 py-10">
         <div className="mx-auto max-w-6xl">
           <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Find a helper near you</h1>
           <p className="text-gray-500 text-base">Verified locals ready to help — book in minutes</p>
 
-          {/* Stats bar */}
+          {/* Search bar */}
+          <div className="relative mt-6 w-full">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" style={{ zIndex: 1 }} />
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search by name, service, or location…"
+              style={{ width: '100%', paddingLeft: '2.75rem', paddingRight: query ? '2.5rem' : '1rem' }}
+              className="block rounded-2xl border border-gray-200 bg-white py-3.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 shadow-sm transition"
+            />
+            {query && (
+              <button onClick={() => setQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-6 mt-6 text-sm text-gray-500">
             {[
               { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, label: '2,400+ helpers' },
@@ -216,12 +304,12 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
 
       <div className="mx-auto max-w-6xl px-6 py-8">
 
-        {/* Category filter */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-8 scrollbar-hide">
+        {/* Category chips */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
           {CATEGORIES.map(cat => (
-            <button key={cat} onClick={() => setSelected(cat)}
+            <button key={cat} onClick={() => setCategory(cat)}
               className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all border"
-              style={selected === cat
+              style={category === cat
                 ? { background: 'linear-gradient(90deg,#2563EB,#38BDF8)', color: '#fff', borderColor: 'transparent' }
                 : { background: '#fff', color: '#374151', borderColor: '#E5E7EB' }}>
               {cat}
@@ -229,29 +317,93 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
           ))}
         </div>
 
-        {/* Sort + count */}
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-gray-500">
-            <span className="font-bold text-gray-900">{filtered.length}</span> helpers available
-          </p>
-          <select className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <option>Recommended</option>
-            <option>Highest rated</option>
-            <option>Lowest price</option>
-            <option>Most tasks done</option>
+        {/* Filter strip */}
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+
+          {/* Price range */}
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm">
+            <span className="text-gray-400 text-xs font-medium">NOK</span>
+            <input
+              type="number" placeholder="Min" value={priceMin}
+              onChange={e => setPriceMin(e.target.value)}
+              className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0"
+            />
+            <span className="text-gray-300 text-xs">–</span>
+            <input
+              type="number" placeholder="Max" value={priceMax}
+              onChange={e => setPriceMax(e.target.value)}
+              className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0"
+            />
+          </div>
+
+          {/* Location */}
+          <select value={location} onChange={e => setLocation(e.target.value)}
+            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
+            {locations.map(l => <option key={l} value={l}>{l === 'All' ? 'Any location' : l}</option>)}
           </select>
+
+          {/* Min rating */}
+          <select value={minRating} onChange={e => setMinRating(Number(e.target.value))}
+            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
+            <option value={0}>Any rating</option>
+            <option value={3}>★ 3+</option>
+            <option value={4}>★ 4+</option>
+            <option value={4.5}>★ 4.5+</option>
+          </select>
+
+          {/* Availability */}
+          <select value={maxResponseHours} onChange={e => setMaxResponseHours(Number(e.target.value))}
+            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
+            <option value={24}>Any availability</option>
+            <option value={1}>Available now (&lt; 1h)</option>
+            <option value={2}>Responds quickly (&lt; 2h)</option>
+            <option value={4}>Within 4 hours</option>
+          </select>
+
+          {/* Clear all */}
+          {hasActiveFilters && (
+            <button onClick={clearAll}
+              className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
+              <X size={13} />
+              Clear
+            </button>
+          )}
+
+          {/* Sort — pushed to the right */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-gray-400 hidden sm:inline">Sort:</span>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
+              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
         </div>
 
-        {/* Tasker grid */}
+        {/* Results count */}
+        <div className="flex items-center gap-2 mb-6">
+          <p className="text-sm text-gray-500">
+            <span className="font-bold text-gray-900">{filtered.length}</span> helper{filtered.length !== 1 ? 's' : ''} found
+          </p>
+          {hasActiveFilters && (
+            <button onClick={clearAll} className="text-xs text-blue-600 hover:underline">
+              clear filters
+            </button>
+          )}
+        </div>
+
+        {/* Grid */}
         {filtered.length === 0 ? (
           <div className="text-center py-20">
             <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              <Search size={28} className="text-gray-300" />
             </div>
-            <p className="text-gray-500 font-medium">No helpers found for this category yet.</p>
-            <Link href="/signup" className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:underline">
-              Be the first to sign up as a helper →
-            </Link>
+            <p className="text-gray-700 font-semibold mb-1">No helpers match your search</p>
+            <p className="text-gray-400 text-sm mb-4">Try adjusting your filters or search terms</p>
+            <button onClick={clearAll}
+              className="rounded-xl px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+              style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+              Clear all filters
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -261,7 +413,7 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
           </div>
         )}
 
-        {/* CTA to become a helper */}
+        {/* CTA */}
         <div className="mt-14 rounded-2xl border border-blue-100 bg-blue-50 px-8 py-10 text-center">
           <h3 className="text-lg font-extrabold text-gray-900 mb-2">Are you a skilled professional?</h3>
           <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">Join SkillLink as a helper and start earning on your own schedule.</p>

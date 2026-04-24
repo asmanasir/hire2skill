@@ -306,7 +306,8 @@ export default function PostForm() {
                     <input type="text" value={location} onChange={e => handleLocChange(e.target.value)}
                       onFocus={() => { if (location.length >= 1) setShowLocSuggestions(locSuggestions.length > 0) }}
                       placeholder="Search city or neighbourhood..."
-                      className={`w-full rounded-xl border pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition ${errors.location ? 'border-red-400' : 'border-gray-200 focus:border-blue-400'}`} />
+                      style={{ paddingLeft: '2.25rem' }}
+                      className={`w-full rounded-xl border pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition ${errors.location ? 'border-red-400' : 'border-gray-200 focus:border-blue-400'}`} />
                   </div>
                   {showLocSuggestions && locSuggestions.length > 0 && (
                     <ul className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">

@@ -20,23 +20,18 @@ export default async function TaskersPage({ searchParams }: { searchParams: Prom
   const { category } = await searchParams
   const supabase = await createClient()
 
-  const query = supabase
+  const { data: profiles } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, display_name, bio, hourly_rate, categories, location, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url')
     .eq('role', 'helper')
-    .is('deleted_at', null)
+    .not('display_name', 'is', null)
     .order('tasks_done', { ascending: false })
-    .limit(20)
+    .limit(100)
 
-  const { data: profiles } = category
-    ? await query.contains('categories', [category])
-    : await query
-
-  // Use real DB data when any real helpers exist; fall back to sample only when DB is empty
   const hasRealData = profiles && profiles.length > 0
   const taskers = hasRealData
-    ? profiles
-    : SAMPLE_TASKERS.filter(t => !category || t.categories.includes(category))
+    ? profiles.map(p => ({ ...p, rating: (p.avg_rating ?? p.rating ?? 0) }))
+    : SAMPLE_TASKERS
 
   return <TaskersContent taskers={taskers} activeCategory={category ?? null} />
 }

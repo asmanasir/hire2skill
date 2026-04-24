@@ -425,7 +425,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
             }`}>
             {tab.label}
             {tab.key === 'tasks' && notifCount > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-blue-600 min-w-4.5 h-4.5 px-1 text-[11px] font-bold text-white">
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-blue-600 w-5 h-5 text-[11px] font-bold text-white shrink-0">
                 {notifCount}
               </span>
             )}

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import TaskerProfileContent from './TaskerProfileContent'
 
+export const dynamic = 'force-dynamic'
+
 const SAMPLE_TASKERS = [
   { id: 's1', display_name: 'Maria K.', bio: 'Professional cleaner with 5 years of hands-on experience. I bring my own eco-friendly supplies and take real pride in leaving every home spotless. Available weekdays and weekends in Oslo and nearby areas. I specialise in deep cleans, move-in/move-out cleaning, and regular weekly visits.', hourly_rate: 350, categories: ['Cleaning'], location: 'Oslo', verified: true, tasks_done: 52, rating: 4.9, response_hours: 1, avatar_url: null },
   { id: 's2', display_name: 'Erik R.', bio: 'Strong, reliable, and punctual. I own a large van and help with residential moves, heavy lifting, furniture assembly, and IKEA build-outs. I have moved over 38 households in Bergen and always handle your belongings with care. Happy to quote for jobs of any size.', hourly_rate: 500, categories: ['Moving'], location: 'Bergen', verified: true, tasks_done: 38, rating: 4.8, response_hours: 2, avatar_url: null },
