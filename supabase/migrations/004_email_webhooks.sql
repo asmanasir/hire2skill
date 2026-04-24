@@ -12,6 +12,9 @@
 -- Alternatively, use the Supabase Dashboard → Database → Webhooks UI
 -- to point each trigger to the function URLs — no SQL needed.
 
+-- Create private schema for internal helper functions
+CREATE SCHEMA IF NOT EXISTS private;
+
 -- Enable pg_net if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
