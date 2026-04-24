@@ -3,6 +3,7 @@
 import React from 'react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 type Tasker = {
   id: string
@@ -88,8 +89,11 @@ export default function TaskerProfileContent({
 }) {
   const [showRequest, setShowRequest] = useState(false)
   const [message, setMessage] = useState('')
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [budget, setBudget] = useState('')
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
+  const [reqError, setReqError] = useState('')
 
   const initials = tasker.display_name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
   const avatarColor = AVATAR_COLORS[tasker.id.charCodeAt(tasker.id.length - 1) % AVATAR_COLORS.length]
@@ -99,10 +103,26 @@ export default function TaskerProfileContent({
 
   async function handleSendRequest(e: React.FormEvent) {
     e.preventDefault()
+    if (!currentUserId) return
     setSending(true)
-    await new Promise(r => setTimeout(r, 800))
+    setReqError('')
+
+    const supabase = createClient()
+    const { error } = await supabase.from('bookings').insert({
+      poster_id: currentUserId,
+      helper_id: tasker.id,
+      message: message.trim(),
+      scheduled_date: scheduledDate || null,
+      budget: budget ? Number(budget) : null,
+      status: 'pending',
+    })
+
     setSending(false)
-    setSent(true)
+    if (error) {
+      setReqError(error.message)
+    } else {
+      setSent(true)
+    }
   }
 
   return (
@@ -323,7 +343,11 @@ export default function TaskerProfileContent({
                 <span className="text-sm text-gray-400">per hour</span>
               </div>
 
-              {isLoggedIn ? (
+              {currentUserId === tasker.id ? (
+                <div className="rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-sm text-gray-500">
+                  This is your profile
+                </div>
+              ) : isLoggedIn ? (
                 <button
                   onClick={() => setShowRequest(true)}
                   className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
@@ -401,6 +425,9 @@ export default function TaskerProfileContent({
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">When?</label>
                       <input
                         type="date"
+                        value={scheduledDate}
+                        onChange={e => setScheduledDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
                         className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                       />
                     </div>
@@ -408,11 +435,18 @@ export default function TaskerProfileContent({
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Budget (NOK)</label>
                       <input
                         type="number"
+                        value={budget}
+                        onChange={e => setBudget(e.target.value)}
                         placeholder={String(tasker.hourly_rate)}
+                        min="0"
                         className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                       />
                     </div>
                   </div>
+
+                  {reqError && (
+                    <p className="text-xs text-red-500 rounded-lg bg-red-50 px-3 py-2">{reqError}</p>
+                  )}
 
                   <div className="flex gap-3 pt-2">
                     <button
@@ -423,7 +457,7 @@ export default function TaskerProfileContent({
                     </button>
                     <button
                       type="submit"
-                      disabled={sending}
+                      disabled={sending || !message.trim()}
                       className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                       style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
                       {sending ? 'Sending...' : 'Send request'}
