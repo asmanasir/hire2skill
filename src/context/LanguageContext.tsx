@@ -1,9 +1,9 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { translations, locales, type Locale } from '@/lib/i18n/translations'
+import { translations, locales, type Locale, type TranslationType } from '@/lib/i18n/translations'
 
-type T = typeof translations['en']
+type T = TranslationType
 
 const LanguageContext = createContext<{
   locale: Locale

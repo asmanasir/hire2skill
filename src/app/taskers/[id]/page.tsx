@@ -1,0 +1,75 @@
+import { createClient } from '@/lib/supabase/server'
+import { notFound } from 'next/navigation'
+import TaskerProfileContent from './TaskerProfileContent'
+
+const SAMPLE_TASKERS = [
+  { id: 's1', display_name: 'Maria K.', bio: 'Professional cleaner with 5 years of hands-on experience. I bring my own eco-friendly supplies and take real pride in leaving every home spotless. Available weekdays and weekends in Oslo and nearby areas. I specialise in deep cleans, move-in/move-out cleaning, and regular weekly visits.', hourly_rate: 350, categories: ['Cleaning'], location: 'Oslo', verified: true, tasks_done: 52, rating: 4.9, response_hours: 1, avatar_url: null },
+  { id: 's2', display_name: 'Erik R.', bio: 'Strong, reliable, and punctual. I own a large van and help with residential moves, heavy lifting, furniture assembly, and IKEA build-outs. I have moved over 38 households in Bergen and always handle your belongings with care. Happy to quote for jobs of any size.', hourly_rate: 500, categories: ['Moving'], location: 'Bergen', verified: true, tasks_done: 38, rating: 4.8, response_hours: 2, avatar_url: null },
+  { id: 's3', display_name: 'Amina S.', bio: 'Experienced math, science, and English tutor for students aged 8–25. I hold a Masters in Education and have 4 years of private tutoring experience. My students consistently improve at least one grade level within three months. I adapt to each students learning style and set clear goals.', hourly_rate: 400, categories: ['Tutoring'], location: 'Oslo', verified: true, tasks_done: 74, rating: 5.0, response_hours: 1, avatar_url: null },
+  { id: 's4', display_name: 'Jonas B.', bio: 'IT professional with 8 years of industry experience. I fix slow computers, remove viruses, set up home networks, configure smart home devices, and help with smartphones and tablets. I explain everything in plain language — no jargon. Remote or on-site support available.', hourly_rate: 450, categories: ['IT & Tech'], location: 'Trondheim', verified: false, tasks_done: 29, rating: 4.7, response_hours: 3, avatar_url: null },
+  { id: 's5', display_name: 'Sara L.', bio: 'Professional event coordinator with a passion for creating memorable experiences. From intimate birthday dinners to corporate conferences, I handle logistics, vendor coordination, and on-the-day management so you can relax and enjoy the occasion.', hourly_rate: 380, categories: ['Events'], location: 'Oslo', verified: true, tasks_done: 41, rating: 4.8, response_hours: 2, avatar_url: null },
+  { id: 's6', display_name: 'Mikkel T.', bio: 'Skilled handyman covering all small and medium repairs: painting, wallpapering, shelf installation, furniture assembly, minor plumbing fixes, and general home maintenance. I come fully equipped with my own tools and always leave the work area clean.', hourly_rate: 420, categories: ['Handyman'], location: 'Stavanger', verified: true, tasks_done: 63, rating: 4.9, response_hours: 1, avatar_url: null },
+]
+
+const SAMPLE_REVIEWS: Record<string, { author: string; date: string; rating: number; text: string }[]> = {
+  s1: [
+    { author: 'Kari M.', date: 'March 2026', rating: 5, text: 'Maria did an incredible deep clean before I moved in. Every corner was spotless. Will definitely book again!' },
+    { author: 'Thomas A.', date: 'February 2026', rating: 5, text: 'Punctual, professional, and thorough. She noticed things I would never have thought to clean. Highly recommend.' },
+    { author: 'Ingrid B.', date: 'January 2026', rating: 4, text: 'Very good work. Arrived on time and finished faster than expected. A couple of small spots were missed but overall great.' },
+  ],
+  s2: [
+    { author: 'Lars P.', date: 'March 2026', rating: 5, text: 'Erik moved our entire 3-bedroom apartment in one trip. Nothing was damaged, super fast and friendly.' },
+    { author: 'Silje H.', date: 'February 2026', rating: 5, text: 'Helped with a heavy sofa that two other companies refused. Absolute legend!' },
+    { author: 'Nils K.', date: 'January 2026', rating: 4, text: 'Great job overall. Arrived 20 minutes late but called ahead to let me know, which I appreciated.' },
+  ],
+  s3: [
+    { author: 'Fatima Z.', date: 'April 2026', rating: 5, text: 'My daughter went from failing maths to topping her class in two months. Amina is a miracle worker.' },
+    { author: 'Henrik S.', date: 'March 2026', rating: 5, text: 'Best tutor I have ever had. Explains things clearly and makes the subject actually interesting.' },
+    { author: 'Camilla R.', date: 'February 2026', rating: 5, text: 'Patient, knowledgeable, and flexible with scheduling. 100% would recommend to any parent.' },
+  ],
+  s4: [
+    { author: 'Olav D.', date: 'March 2026', rating: 5, text: 'Fixed my laptop in under an hour and explained exactly what was wrong. Honest and knowledgeable.' },
+    { author: 'Marte J.', date: 'February 2026', rating: 4, text: 'Set up my whole home network. Took longer than expected but the result is perfect.' },
+  ],
+  s5: [
+    { author: 'Petter L.', date: 'April 2026', rating: 5, text: 'Sara organised our company summer party and it was flawless. Every detail was perfect.' },
+    { author: 'Anette V.', date: 'March 2026', rating: 5, text: 'She turned my daughter\'s 10th birthday into something magical. Guests are still talking about it.' },
+    { author: 'Bjørn G.', date: 'January 2026', rating: 4, text: 'Very professional and creative. A few small miscommunications early on but she resolved them quickly.' },
+  ],
+  s6: [
+    { author: 'Rune T.', date: 'March 2026', rating: 5, text: 'Mikkel put up shelves, fixed a leaky tap, and repainted a wall — all in one visit. Extremely efficient.' },
+    { author: 'Hilde N.', date: 'February 2026', rating: 5, text: 'Friendly, tidy, and fair price. My go-to handyman from now on.' },
+    { author: 'Eirik F.', date: 'January 2026', rating: 5, text: 'Assembled 6 pieces of IKEA furniture in record time. Excellent work and great chat too.' },
+  ],
+}
+
+export default async function TaskerProfilePage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  const tasker = profile ?? SAMPLE_TASKERS.find(t => t.id === id)
+  if (!tasker) notFound()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const reviews = SAMPLE_REVIEWS[id] ?? SAMPLE_REVIEWS.s1
+
+  return (
+    <TaskerProfileContent
+      tasker={tasker}
+      reviews={reviews}
+      isLoggedIn={!!user}
+      currentUserId={user?.id ?? null}
+    />
+  )
+}

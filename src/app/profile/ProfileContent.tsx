@@ -1,0 +1,857 @@
+'use client'
+
+import React, { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type UserInfo = { id: string; email: string; created_at: string }
+
+type Profile = {
+  id: string
+  role: string | null
+  display_name: string | null
+  bio: string | null
+  hourly_rate: number | null
+  categories: string[] | null
+  location: string | null
+  verified: boolean
+  tasks_done: number
+  rating: number
+  avatar_url: string | null
+  phone: string | null
+  notifications: Record<string, boolean> | null
+  business_name: string | null
+  business_website: string | null
+  business_description: string | null
+}
+
+type Post = {
+  id: string
+  title: string
+  category: string
+  status: string
+  created_at: string
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const TABS = [
+  { key: 'profile',       label: 'Profile' },
+  { key: 'password',      label: 'Password' },
+  { key: 'security',      label: 'Account Security' },
+  { key: 'notifications', label: 'Notifications' },
+  { key: 'billing',       label: 'Billing Info' },
+  { key: 'cancel',        label: 'Cancel a Task' },
+  { key: 'business',      label: 'Business Information' },
+  { key: 'balance',       label: 'Account Balance' },
+  { key: 'transactions',  label: 'Transactions' },
+  { key: 'delete',        label: 'Delete Account' },
+]
+
+const SERVICE_CATEGORIES = [
+  'Cleaning','Moving','Tutoring','Delivery','Handyman','Events',
+  'IT & Tech','Gardening','Pet Care','Cooking','Shopping','Knitting',
+  'Sewing','Kids Care','Car Wash','Painting','Makeup Artist','Hair Dresser',
+]
+
+const AVATAR_COLORS = ['#2563EB','#16A34A','#7C3AED','#D97706','#E11D48','#0284C7']
+
+const NORWAY_LOCATIONS = [
+  'Oslo – Sentrum','Oslo – Grünerløkka','Oslo – Grønland','Oslo – Tøyen',
+  'Oslo – Gamlebyen','Oslo – Sørenga','Oslo – Tjuvholmen','Oslo – Aker Brygge',
+  'Oslo – Bislett','Oslo – St. Hanshaugen',
+  'Oslo – Frogner','Oslo – Majorstuen','Oslo – Skøyen','Oslo – Lysaker',
+  'Oslo – Bygdøy','Oslo – Ullern','Oslo – Montebello','Oslo – Smestad',
+  'Oslo – Røa','Oslo – Vinderen','Oslo – Hovseter','Oslo – Holmenkollen',
+  'Oslo – Sagene','Oslo – Sandaker','Oslo – Storo','Oslo – Nydalen',
+  'Oslo – Sinsen','Oslo – Grefsen','Oslo – Kjelsås','Oslo – Tåsen',
+  'Oslo – Alna','Oslo – Furuset','Oslo – Lindeberg','Oslo – Trosterud',
+  'Oslo – Ellingsrudåsen','Oslo – Haugerud','Oslo – Teisen','Oslo – Rødtvet',
+  'Oslo – Grorud','Oslo – Ammerud','Oslo – Romsås','Oslo – Kalbakken',
+  'Oslo – Stovner','Oslo – Haugenstua','Oslo – Vestli','Oslo – Karihaugen',
+  'Oslo – Bjerke','Oslo – Veitvet','Oslo – Carl Berner','Oslo – Helsfyr',
+  'Oslo – Valle Hovin','Oslo – Nordstrand','Oslo – Ljan','Oslo – Ekeberg',
+  'Oslo – Lambertseter','Oslo – Manglerud','Oslo – Ryen','Oslo – Bryn',
+  'Oslo – Oppsal','Oslo – Bøler','Oslo – Holmlia','Oslo – Mortensrud',
+  'Oslo – Bjørndal','Oslo – Prinsdal',
+  'Bergen – Sentrum','Bergen – Sandviken','Bergen – Nordnes','Bergen – Møhlenpris',
+  'Bergen – Fana','Bergen – Nesttun','Bergen – Paradis','Bergen – Rådal',
+  'Bergen – Ytrebygda','Bergen – Fyllingsdalen','Bergen – Laksevåg',
+  'Bergen – Loddefjord','Bergen – Åsane','Bergen – Arna','Bergen – Indre Arna',
+  'Trondheim – Midtbyen','Trondheim – Møllenberg','Trondheim – Strindheim',
+  'Trondheim – Ranheim','Trondheim – Lerkendal','Trondheim – Singsaker',
+  'Trondheim – Nardo','Trondheim – Heimdal','Trondheim – Saupstad',
+  'Stavanger – Sentrum','Stavanger – Storhaug','Stavanger – Hillevåg',
+  'Stavanger – Hundvåg','Stavanger – Madla','Stavanger – Tasta','Stavanger – Eiganes',
+  'Drammen – Bragernes','Drammen – Strømsø','Drammen – Konnerud',
+  'Bærum','Asker','Jessheim','Lillestrøm','Lørenskog','Ski','Oppegård',
+  'Kristiansand','Tromsø','Sandnes','Fredrikstad','Sarpsborg','Bodø',
+  'Ålesund','Tønsberg','Moss','Hamar','Porsgrunn','Skien','Arendal',
+  'Haugesund','Larvik','Halden','Lillehammer','Molde','Harstad','Gjøvik',
+  'Alta','Hammerfest','Narvik','Tromsø','Mo i Rana',
+]
+
+const DEFAULT_NOTIF: Record<string, boolean> = {
+  task_email: false, task_sms: true,   task_push: false,
+  promo_email: true,  promo_sms: true,  promo_push: true,
+}
+
+// ── Small helpers ─────────────────────────────────────────────────────────────
+
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="mb-6 pb-4 border-b border-gray-100">
+      <h2 className="text-xl font-extrabold text-gray-900">{title}</h2>
+      {sub && <p className="text-sm text-gray-500 mt-1">{sub}</p>}
+    </div>
+  )
+}
+
+function SaveBar({
+  saving, saved, onSave, onCancel,
+}: { saving: boolean; saved: boolean; onSave: () => void; onCancel: () => void }) {
+  return (
+    <div className="flex items-center gap-3 pt-6 border-t border-gray-100 mt-6">
+      <button onClick={onCancel}
+        className="px-5 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-bold text-gray-600 hover:border-gray-300 transition-colors">
+        Cancel
+      </button>
+      <button onClick={onSave} disabled={saving}
+        className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+        style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+        {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'}
+      </button>
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="block text-sm font-semibold text-gray-700 mb-1.5">{children}</label>
+}
+
+function TextInput({ value, onChange, placeholder, readOnly, type = 'text' }: {
+  value: string; onChange?: (v: string) => void; placeholder?: string; readOnly?: boolean; type?: string
+}) {
+  return (
+    <input type={type} value={value} readOnly={readOnly}
+      onChange={e => onChange?.(e.target.value)} placeholder={placeholder}
+      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
+        readOnly
+          ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+          : 'border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
+      }`} />
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function ProfileContent({
+  user,
+  profile: init,
+  posts: initPosts,
+}: {
+  user: UserInfo
+  profile: Profile | null
+  posts: Post[]
+}) {
+  const router = useRouter()
+  const [tab, setTab] = useState('profile')
+
+  // ── Profile tab state
+  const [name, setName]           = useState(init?.display_name ?? '')
+  const [bio, setBio]             = useState(init?.bio ?? '')
+  const [location, setLocation]   = useState(init?.location ?? '')
+  const [rate, setRate]           = useState(String(init?.hourly_rate ?? ''))
+  const [cats, setCats]           = useState<string[]>(init?.categories ?? [])
+  const [avatar, setAvatar]       = useState<string | null>(init?.avatar_url ?? null)
+  const [profSaving, setProfSaving] = useState(false)
+  const [profSaved,  setProfSaved]  = useState(false)
+  const fileRef  = useRef<HTMLInputElement>(null)
+  const locRef   = useRef<HTMLDivElement>(null)
+  const [locSuggestions,     setLocSuggestions]     = useState<string[]>([])
+  const [showLocSuggestions, setShowLocSuggestions] = useState(false)
+
+  // ── Password tab state
+  const [curPw,  setCurPw]  = useState('')
+  const [newPw,  setNewPw]  = useState('')
+  const [confPw, setConfPw] = useState('')
+  const [pwErr,  setPwErr]  = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwSaved,  setPwSaved]  = useState(false)
+
+  // ── Security (phone / 2FA)
+  const [phone,       setPhone]     = useState(init?.phone ?? '')
+  const [phoneStep,   setPhoneStep] = useState<'input' | 'otp' | 'done'>(init?.phone ? 'done' : 'input')
+  const [otp,         setOtp]       = useState('')
+  const [phoneBusy,   setPhoneBusy] = useState(false)
+  const [phoneErr,    setPhoneErr]  = useState('')
+
+  // ── Notifications
+  const [notif,       setNotif]       = useState<Record<string, boolean>>(init?.notifications ?? DEFAULT_NOTIF)
+  const [notifSaving, setNotifSaving] = useState(false)
+  const [notifSaved,  setNotifSaved]  = useState(false)
+
+  // ── Business
+  const [bizName, setBizName] = useState(init?.business_name ?? '')
+  const [bizWeb,  setBizWeb]  = useState(init?.business_website ?? '')
+  const [bizDesc, setBizDesc] = useState(init?.business_description ?? '')
+  const [bizSaving, setBizSaving] = useState(false)
+  const [bizSaved,  setBizSaved]  = useState(false)
+
+  // ── Cancel a task
+  const [posts,         setPosts]         = useState<Post[]>(initPosts)
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const [cancelBusy,    setCancelBusy]    = useState<string | null>(null)
+
+  // ── Delete account modal
+  const [showDelete,   setShowDelete]   = useState(false)
+  const [deleteStep,   setDeleteStep]   = useState<'phone' | 'otp'>('phone')
+  const [delPhone,     setDelPhone]     = useState(init?.phone ?? '')
+  const [delOtp,       setDelOtp]       = useState('')
+  const [delBusy,      setDelBusy]      = useState(false)
+  const [delErr,       setDelErr]       = useState('')
+
+  // ── Derived
+  const initials = (init?.display_name ?? user.email)
+    .split(' ').slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('') ||
+    user.email[0]?.toUpperCase()
+  const avatarColor = AVATAR_COLORS[user.id.charCodeAt(user.id.length - 1) % AVATAR_COLORS.length]
+
+  // ── Effects ──────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      if (locRef.current && !locRef.current.contains(e.target as Node))
+        setShowLocSuggestions(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [])
+
+  function handleLocationChange(val: string) {
+    setLocation(val)
+    if (val.trim().length >= 1) {
+      const matches = NORWAY_LOCATIONS.filter(l =>
+        l.toLowerCase().includes(val.toLowerCase())
+      ).slice(0, 8)
+      setLocSuggestions(matches)
+      setShowLocSuggestions(matches.length > 0)
+    } else {
+      setShowLocSuggestions(false)
+    }
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
+
+  async function uploadAvatar(file: File) {
+    const sb  = createClient()
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/avatar.${ext}`
+    const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = sb.storage.from('avatars').getPublicUrl(path)
+      setAvatar(data.publicUrl)
+    }
+  }
+
+  async function saveProfile() {
+    setProfSaving(true)
+    await createClient().from('profiles').upsert({
+      id: user.id, display_name: name, bio, location,
+      hourly_rate: rate ? Number(rate) : null, categories: cats, avatar_url: avatar,
+    })
+    setProfSaving(false); setProfSaved(true)
+    setTimeout(() => setProfSaved(false), 3000)
+  }
+
+  async function savePassword() {
+    setPwErr('')
+    if (newPw.length < 8) { setPwErr('Password must be at least 8 characters'); return }
+    if (newPw !== confPw)  { setPwErr('Passwords do not match'); return }
+    setPwSaving(true)
+    const { error } = await createClient().auth.updateUser({ password: newPw })
+    setPwSaving(false)
+    if (error) { setPwErr(error.message); return }
+    setPwSaved(true); setCurPw(''); setNewPw(''); setConfPw('')
+    setTimeout(() => setPwSaved(false), 3000)
+  }
+
+  async function sendPhoneCode() {
+    setPhoneBusy(true); setPhoneErr('')
+    await new Promise(r => setTimeout(r, 900))
+    setPhoneBusy(false); setPhoneStep('otp'); setOtp('')
+  }
+
+  async function verifyPhone() {
+    setPhoneBusy(true); setPhoneErr('')
+    const { error } = await createClient().from('profiles').upsert({ id: user.id, phone })
+    setPhoneBusy(false)
+    if (error) { setPhoneErr(error.message); return }
+    setPhoneStep('done')
+  }
+
+  async function saveNotifications() {
+    setNotifSaving(true)
+    await createClient().from('profiles').upsert({ id: user.id, notifications: notif })
+    setNotifSaving(false); setNotifSaved(true)
+    setTimeout(() => setNotifSaved(false), 3000)
+  }
+
+  async function saveBusiness() {
+    setBizSaving(true)
+    await createClient().from('profiles').upsert({
+      id: user.id, business_name: bizName, business_website: bizWeb, business_description: bizDesc,
+    })
+    setBizSaving(false); setBizSaved(true)
+    setTimeout(() => setBizSaved(false), 3000)
+  }
+
+  async function cancelPost(id: string) {
+    setCancelBusy(id)
+    await createClient().from('posts').update({ status: 'cancelled' }).eq('id', id)
+    setPosts(p => p.filter(x => x.id !== id))
+    setCancelBusy(null); setConfirmCancel(null)
+  }
+
+  async function handleDeleteSendCode() {
+    setDelBusy(true); setDelErr('')
+    await new Promise(r => setTimeout(r, 900))
+    setDelBusy(false); setDeleteStep('otp')
+  }
+
+  async function handleDeleteConfirm() {
+    setDelBusy(true); setDelErr('')
+    const sb = createClient()
+    const { error } = await sb.from('profiles').update({ deleted_at: new Date().toISOString() }).eq('id', user.id)
+    if (error) { setDelErr(error.message); setDelBusy(false); return }
+    await sb.auth.signOut()
+    router.push('/')
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-10">
+      <div className="mx-auto max-w-5xl px-6">
+        <h1 className="text-3xl font-extrabold text-gray-900 mb-8">Your Account</h1>
+
+        <div className="flex gap-8 items-start">
+
+          {/* ── Sidebar ── */}
+          <aside className="w-52 shrink-0">
+            <nav className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              {TABS.map((t, i) => (
+                <button key={t.key} onClick={() => setTab(t.key)}
+                  className={`relative block w-full text-left px-4 py-3 text-sm font-medium transition-all
+                    ${i < TABS.length - 1 ? 'border-b border-gray-100' : ''}
+                    ${t.key === 'delete'
+                      ? tab === t.key
+                        ? 'text-red-600 font-bold bg-red-50'
+                        : 'text-red-500 hover:bg-red-50'
+                      : tab === t.key
+                        ? 'text-blue-600 font-bold bg-blue-50'
+                        : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                    }`}>
+                  {tab === t.key && (
+                    <span className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-r ${t.key === 'delete' ? 'bg-red-500' : 'bg-blue-600'}`} />
+                  )}
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
+
+          {/* ── Content panel ── */}
+          <main className="flex-1 bg-white rounded-2xl border border-gray-200 p-8 min-h-[540px]">
+
+            {/* ─── PROFILE ─── */}
+            {tab === 'profile' && (
+              <div>
+                <SectionTitle title="Profile" sub="Update your personal information and how you appear to others." />
+
+                {/* Avatar row */}
+                <div className="flex items-center gap-5 mb-8">
+                  <div className="relative">
+                    {avatar
+                      ? <img src={avatar} alt="avatar" className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-md" />
+                      : (
+                        <div className="h-20 w-20 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-md"
+                          style={{ background: avatarColor }}>
+                          {initials}
+                        </div>
+                      )
+                    }
+                    <button onClick={() => fileRef.current?.click()}
+                      className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center hover:border-blue-400 transition-colors shadow-sm">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                    </button>
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f) }} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{name || user.email}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Member since {new Date(user.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                    </p>
+                    <button onClick={() => fileRef.current?.click()}
+                      className="mt-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
+                      Change photo
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  <div><FieldLabel>Display name</FieldLabel><TextInput value={name} onChange={setName} placeholder="Your full name" /></div>
+                  <div>
+                    <FieldLabel>Email</FieldLabel>
+                    <TextInput value={user.email} readOnly />
+                    <p className="mt-1 text-xs text-gray-400">Email cannot be changed here</p>
+                  </div>
+                  <div>
+                    <FieldLabel>About me</FieldLabel>
+                    <textarea rows={4} value={bio} onChange={e => setBio(e.target.value)}
+                      placeholder="Tell people about yourself and what makes you great…"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none" />
+                  </div>
+                  <div>
+                    <FieldLabel>Location</FieldLabel>
+                    <div ref={locRef} className="relative">
+                      <div className="relative">
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                          width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <input type="text" value={location}
+                          onChange={e => handleLocationChange(e.target.value)}
+                          onFocus={() => location.trim().length >= 1 && setShowLocSuggestions(locSuggestions.length > 0)}
+                          placeholder="e.g. Oslo – Grünerløkka"
+                          className="w-full rounded-xl border border-gray-200 pl-9 pr-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+                      </div>
+                      {showLocSuggestions && (
+                        <ul className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                          {locSuggestions.map(s => (
+                            <li key={s}>
+                              <button type="button"
+                                onMouseDown={() => { setLocation(s); setShowLocSuggestions(false) }}
+                                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-blue-50 transition-colors">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                                </svg>
+                                <span className="text-gray-700">{s}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+
+                  {init?.role === 'helper' && (
+                    <>
+                      <div><FieldLabel>Hourly rate (NOK)</FieldLabel><TextInput type="number" value={rate} onChange={setRate} placeholder="e.g. 350" /></div>
+                      <div>
+                        <FieldLabel>Services offered</FieldLabel>
+                        <div className="flex flex-wrap gap-2 mt-0.5">
+                          {SERVICE_CATEGORIES.map(c => (
+                            <button key={c} type="button"
+                              onClick={() => setCats(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])}
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                                cats.includes(c)
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                              }`}>
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <SaveBar saving={profSaving} saved={profSaved} onSave={saveProfile}
+                  onCancel={() => { setName(init?.display_name ?? ''); setBio(init?.bio ?? ''); setLocation(init?.location ?? ''); setRate(String(init?.hourly_rate ?? '')); setCats(init?.categories ?? []) }} />
+              </div>
+            )}
+
+            {/* ─── PASSWORD ─── */}
+            {tab === 'password' && (
+              <div>
+                <SectionTitle title="Password" sub="Keep your account secure by using a strong password." />
+                <div className="max-w-md space-y-5">
+                  <div><FieldLabel>Current password</FieldLabel><TextInput type="password" value={curPw} onChange={setCurPw} placeholder="••••••••" /></div>
+                  <div><FieldLabel>New password</FieldLabel><TextInput type="password" value={newPw} onChange={setNewPw} placeholder="Min. 8 characters" /></div>
+                  <div><FieldLabel>Confirm new password</FieldLabel><TextInput type="password" value={confPw} onChange={setConfPw} placeholder="Repeat new password" /></div>
+                  {pwErr && (
+                    <p className="flex items-center gap-1.5 text-sm text-red-500">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      {pwErr}
+                    </p>
+                  )}
+                </div>
+                <SaveBar saving={pwSaving} saved={pwSaved} onSave={savePassword}
+                  onCancel={() => { setCurPw(''); setNewPw(''); setConfPw(''); setPwErr('') }} />
+              </div>
+            )}
+
+            {/* ─── SECURITY ─── */}
+            {tab === 'security' && (
+              <div>
+                <SectionTitle title="Account Security" sub="Manage two-factor authentication and your verified email." />
+
+                {/* Email verified badge */}
+                <div className="flex items-center justify-between p-5 rounded-xl bg-gray-50 border border-gray-100 mb-8">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Email address</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{user.email}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 border border-green-100">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Verified
+                  </span>
+                </div>
+
+                {/* Phone / 2FA */}
+                <h3 className="text-sm font-extrabold text-gray-900 mb-1">Two-factor authentication</h3>
+                <p className="text-sm text-gray-500 mb-5">Add your phone number to receive a security code when signing in.</p>
+
+                {phoneStep === 'done' ? (
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-100">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <div>
+                      <p className="text-sm font-bold text-green-800">Phone verified</p>
+                      <p className="text-xs text-green-600">+47 {phone}</p>
+                    </div>
+                    <button onClick={() => setPhoneStep('input')} className="ml-auto text-xs font-semibold text-green-700 hover:text-green-800">Change</button>
+                  </div>
+                ) : phoneStep === 'input' ? (
+                  <div className="max-w-sm space-y-4">
+                    <div>
+                      <FieldLabel>Phone number</FieldLabel>
+                      <div className="flex gap-2">
+                        <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 shrink-0">
+                          <span>🇳🇴</span>
+                          <span className="text-sm font-semibold text-gray-700">+47</span>
+                        </div>
+                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="91 23 45 67"
+                          className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+                      </div>
+                    </div>
+                    {phoneErr && <p className="text-xs text-red-500">{phoneErr}</p>}
+                    <button onClick={sendPhoneCode} disabled={!phone || phoneBusy}
+                      className="w-full rounded-xl py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                      style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+                      {phoneBusy ? 'Sending…' : 'Send Code'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="max-w-sm space-y-4">
+                    <p className="text-sm text-gray-500">Enter the 6-digit code sent to +47 {phone}</p>
+                    <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                      maxLength={6} placeholder="000000"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-lg font-bold text-center tracking-[0.6em] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                      SMS is not active yet — type any 6 digits to save your phone number.
+                    </p>
+                    {phoneErr && <p className="text-xs text-red-500">{phoneErr}</p>}
+                    <div className="flex gap-3">
+                      <button onClick={() => { setPhoneStep('input'); setPhoneErr('') }}
+                        className="flex-1 rounded-xl py-2.5 text-sm font-bold border-2 border-gray-200 text-gray-600 hover:border-gray-300 transition-colors">Back</button>
+                      <button onClick={verifyPhone} disabled={otp.length < 6 || phoneBusy}
+                        className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                        style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+                        {phoneBusy ? 'Verifying…' : 'Verify'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── NOTIFICATIONS ─── */}
+            {tab === 'notifications' && (
+              <div>
+                <SectionTitle title="Notifications" sub="Choose how you want to be notified about activity on SkillLink." />
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 pr-8 font-semibold text-gray-700">Form of Communication</th>
+                        {(['Email','SMS','Push Notification'] as const).map(h => (
+                          <th key={h} className="text-center py-3 px-6 font-semibold text-gray-700">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { key: 'task',  label: 'Task Updates' },
+                        { key: 'promo', label: 'Promotional Emails and Notifications' },
+                      ].map((row, ri) => (
+                        <tr key={row.key} className={ri === 0 ? 'border-b border-gray-100' : ''}>
+                          <td className="py-4 pr-8 text-gray-700">{row.label}</td>
+                          {(['email','sms','push'] as const).map(ch => (
+                            <td key={ch} className="py-4 px-6 text-center">
+                              <input type="checkbox"
+                                checked={notif[`${row.key}_${ch}`] ?? false}
+                                onChange={e => setNotif(p => ({ ...p, [`${row.key}_${ch}`]: e.target.checked }))}
+                                className="h-4 w-4 rounded accent-blue-600 cursor-pointer" />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <SaveBar saving={notifSaving} saved={notifSaved} onSave={saveNotifications}
+                  onCancel={() => setNotif(init?.notifications ?? DEFAULT_NOTIF)} />
+              </div>
+            )}
+
+            {/* ─── BILLING ─── */}
+            {tab === 'billing' && (
+              <div>
+                <SectionTitle title="Billing Info" sub="Manage your payment methods and billing details." />
+                <div className="flex flex-col items-center justify-center py-14 text-center">
+                  <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-5"
+                    style={{ background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                    </svg>
+                  </div>
+                  <p className="text-base font-extrabold text-gray-900 mb-2">Payment methods</p>
+                  <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+                    Stripe and Vipps payment integration is coming soon. You will be able to add cards and pay directly through SkillLink.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ─── CANCEL A TASK ─── */}
+            {tab === 'cancel' && (
+              <div>
+                <SectionTitle title="Cancel a Task" sub="View and cancel your open task requests." />
+
+                {posts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                    <div className="h-14 w-14 rounded-2xl flex items-center justify-center mb-4 bg-gray-50 border border-gray-100">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
+                      </svg>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900">No active tasks</p>
+                    <p className="text-xs text-gray-400 mt-1">Your open task posts will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {posts.map(post => (
+                      <div key={post.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">{post.title}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-xs text-gray-400">{post.category}</span>
+                            <span className="text-xs text-gray-300">·</span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(post.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
+                          post.status === 'open' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+                        }`}>{post.status}</span>
+
+                        {confirmCancel === post.id ? (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button onClick={() => setConfirmCancel(null)}
+                              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+                              Keep
+                            </button>
+                            <button onClick={() => cancelPost(post.id)} disabled={cancelBusy === post.id}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition-colors disabled:opacity-60">
+                              {cancelBusy === post.id ? '…' : 'Yes, cancel'}
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmCancel(post.id)}
+                            className="shrink-0 text-xs font-semibold text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                            Cancel task
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── BUSINESS INFORMATION ─── */}
+            {tab === 'business' && (
+              <div>
+                <SectionTitle title="Business Information" sub="Add your business details to build trust with customers." />
+                <div className="max-w-md space-y-5">
+                  <div><FieldLabel>Business name</FieldLabel><TextInput value={bizName} onChange={setBizName} placeholder="e.g. Oslo Clean Pro AS" /></div>
+                  <div><FieldLabel>Website</FieldLabel><TextInput type="url" value={bizWeb} onChange={setBizWeb} placeholder="https://yourwebsite.no" /></div>
+                  <div>
+                    <FieldLabel>Description</FieldLabel>
+                    <textarea rows={4} value={bizDesc} onChange={e => setBizDesc(e.target.value)}
+                      placeholder="Brief description of your business, services, and experience…"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none" />
+                  </div>
+                </div>
+                <SaveBar saving={bizSaving} saved={bizSaved} onSave={saveBusiness}
+                  onCancel={() => { setBizName(init?.business_name ?? ''); setBizWeb(init?.business_website ?? ''); setBizDesc(init?.business_description ?? '') }} />
+              </div>
+            )}
+
+            {/* ─── ACCOUNT BALANCE ─── */}
+            {tab === 'balance' && (
+              <div>
+                <SectionTitle title="Account Balance" sub="Your SkillLink credit balance." />
+                <div className="flex items-center gap-6 p-6 rounded-2xl mb-8"
+                  style={{ background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)' }}>
+                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-white shadow-sm shrink-0">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide">Current balance</p>
+                    <p className="text-4xl font-extrabold text-blue-900 mt-0.5">
+                      0 <span className="text-2xl font-bold text-blue-400">NOK</span>
+                    </p>
+                  </div>
+                </div>
+                <button disabled
+                  className="px-6 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed"
+                  style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+                  Add Credits — Coming Soon
+                </button>
+                <p className="text-xs text-gray-400 mt-2">Vipps and card top-up coming with payment integration.</p>
+              </div>
+            )}
+
+            {/* ─── TRANSACTIONS ─── */}
+            {tab === 'transactions' && (
+              <div>
+                <SectionTitle title="Transactions" sub="History of all payments and credits on your account." />
+                <div className="flex flex-col items-center justify-center py-14 text-center">
+                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center mb-4 bg-gray-50 border border-gray-100">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">No transactions yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Your payment history will appear here once payments are enabled.</p>
+                </div>
+              </div>
+            )}
+
+            {/* ─── DELETE ACCOUNT ─── */}
+            {tab === 'delete' && (
+              <div>
+                <SectionTitle title="Account Deletion" />
+                <div className="max-w-lg">
+                  <div className="flex gap-3 p-4 rounded-xl bg-red-50 border border-red-100 mb-6">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <p className="text-sm text-red-700">
+                      Once you have deleted your account, you will no longer be able to log in to the SkillLink site or apps.{' '}
+                      <strong>This action cannot be undone.</strong>
+                    </p>
+                  </div>
+                  <button onClick={() => { setShowDelete(true); setDeleteStep('phone'); setDelErr('') }}
+                    className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">
+                    Delete Account
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </main>
+        </div>
+      </div>
+
+      {/* ── Delete Account Modal ──────────────────────────────────────────────── */}
+      {showDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+            {/* Modal header */}
+            <div className="relative border-b border-gray-100 px-6 py-4">
+              <button onClick={() => setShowDelete(false)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6"/>
+                </svg>
+              </button>
+              <h3 className="text-base font-extrabold text-gray-900 text-center">Authentication Required</h3>
+            </div>
+
+            {/* Modal body */}
+            <div className="px-6 py-6">
+              {deleteStep === 'phone' ? (
+                <>
+                  <p className="text-sm text-blue-600 text-center mb-6 leading-relaxed">
+                    To keep your account secure, enter your phone number to receive a security code and confirm account deletion.
+                  </p>
+
+                  <div className="flex gap-2 mb-5">
+                    <div className="flex items-center gap-1.5 px-3 py-3 rounded-xl border border-gray-200 bg-gray-50 shrink-0">
+                      <span>🇳🇴</span>
+                      <span className="text-sm font-semibold text-gray-700">+47</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5">
+                        <path d="M6 9l6 6 6-6"/>
+                      </svg>
+                    </div>
+                    <input type="tel" value={delPhone} onChange={e => setDelPhone(e.target.value)}
+                      placeholder="91 23 45 67"
+                      className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition" />
+                  </div>
+
+                  {delErr && <p className="text-xs text-red-500 mb-3 text-center">{delErr}</p>}
+
+                  <button onClick={handleDeleteSendCode} disabled={!delPhone || delBusy}
+                    className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+                    {delBusy ? 'Sending…' : 'Send Code'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 text-center mb-6">
+                    Enter the 6-digit code sent to +47 {delPhone}
+                  </p>
+
+                  <input type="text" value={delOtp} onChange={e => setDelOtp(e.target.value)}
+                    maxLength={6} placeholder="000000"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-center tracking-[0.5em] outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition mb-3" />
+
+                  <p className="text-xs text-gray-400 text-center mb-5">
+                    By continuing, you permanently delete your SkillLink account and all data.
+                  </p>
+
+                  {delErr && <p className="text-xs text-red-500 mb-3 text-center">{delErr}</p>}
+
+                  <button onClick={handleDeleteConfirm} disabled={delOtp.length < 4 || delBusy}
+                    className="w-full rounded-xl py-3.5 text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50 mb-2">
+                    {delBusy ? 'Deleting…' : 'Permanently Delete Account'}
+                  </button>
+
+                  <button onClick={() => setDeleteStep('phone')}
+                    className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                    Back
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
