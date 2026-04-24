@@ -62,11 +62,44 @@ export default async function TaskerProfilePage({
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const reviews = SAMPLE_REVIEWS[id] ?? SAMPLE_REVIEWS.s1
+  // Fetch real reviews for real profiles; keep sample data for demo taskers
+  let reviews: { author: string; date: string; rating: number; text: string }[] = []
+  if (profile) {
+    try {
+      const { data: rawReviews } = await supabase
+        .from('reviews')
+        .select('rating, body, created_at, reviewer_id')
+        .eq('reviewee_id', id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      if (rawReviews && rawReviews.length > 0) {
+        const reviewerIds = [...new Set(rawReviews.map(r => r.reviewer_id))]
+        const { data: reviewerProfiles } = await supabase
+          .from('profiles').select('id, display_name').in('id', reviewerIds)
+        const nameMap = Object.fromEntries((reviewerProfiles ?? []).map(p => [p.id, p.display_name]))
+        reviews = rawReviews.map(r => ({
+          author: nameMap[r.reviewer_id] ?? 'Anonymous',
+          date: new Date(r.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          rating: r.rating,
+          text: r.body ?? '',
+        }))
+      }
+    } catch {
+      // reviews table not yet created
+    }
+  } else {
+    reviews = SAMPLE_REVIEWS[id] ?? SAMPLE_REVIEWS.s1
+  }
+
+  // Map avg_rating → rating field for real profiles
+  const resolvedTasker = profile
+    ? { ...profile, rating: (profile as Record<string, unknown>).avg_rating as number ?? profile.rating ?? 0 }
+    : tasker
 
   return (
     <TaskerProfileContent
-      tasker={tasker}
+      tasker={resolvedTasker}
       reviews={reviews}
       isLoggedIn={!!user}
       currentUserId={user?.id ?? null}

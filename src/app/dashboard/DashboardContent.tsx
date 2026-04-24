@@ -14,6 +14,7 @@ type Props = {
   role: 'helper' | 'poster' | null
   bookings: BookingItem[]
   pendingCount: number
+  currentUserId: string
 }
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
@@ -85,14 +86,150 @@ function FilterChips({
   )
 }
 
+function ReviewModal({
+  booking,
+  currentUserId,
+  isHelper,
+  onClose,
+  onDone,
+}: {
+  booking: BookingItem
+  currentUserId: string
+  isHelper: boolean
+  onClose: () => void
+  onDone: (bookingId: string) => void
+}) {
+  const [rating, setRating] = useState(0)
+  const [hover, setHover] = useState(0)
+  const [body, setBody] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (rating === 0) return
+    setSubmitting(true)
+    setError('')
+    const revieweeId = isHelper ? booking.poster_id : booking.helper_id
+    const supabase = createClient()
+    const { error: err } = await supabase.from('reviews').insert({
+      booking_id: booking.id,
+      reviewer_id: currentUserId,
+      reviewee_id: revieweeId,
+      rating,
+      body: body.trim() || null,
+    })
+    setSubmitting(false)
+    if (err) {
+      setError(err.message)
+    } else {
+      setDone(true)
+    }
+  }
+
+  const LABELS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent']
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.45)' }}>
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
+        {done ? (
+          <div className="text-center">
+            <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'linear-gradient(135deg,#FFFBEB,#FDE68A)' }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#F59E0B">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <h3 className="text-xl font-extrabold text-gray-900 mb-2">Review submitted!</h3>
+            <p className="text-sm text-gray-500 mb-6">Thanks for sharing your feedback.</p>
+            <button onClick={() => { onDone(booking.id); onClose() }}
+              className="w-full rounded-xl py-3 text-sm font-bold text-white hover:opacity-90"
+              style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-extrabold text-gray-900">Leave a review</h3>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-5">
+              How was your experience with{' '}
+              <span className="font-semibold text-gray-800">{booking.other_display_name ?? 'them'}</span>?
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex gap-1 justify-center py-1">
+                {[1,2,3,4,5].map(s => (
+                  <button key={s} type="button"
+                    onMouseEnter={() => setHover(s)}
+                    onMouseLeave={() => setHover(0)}
+                    onClick={() => setRating(s)}>
+                    <svg width="40" height="40" viewBox="0 0 24 24"
+                      fill={(hover || rating) >= s ? '#F59E0B' : '#E5E7EB'}
+                      className="transition-colors duration-100">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                  </button>
+                ))}
+              </div>
+              {(hover || rating) > 0 && (
+                <p className="text-center text-sm font-semibold text-amber-500 -mt-1">
+                  {LABELS[hover || rating]}
+                </p>
+              )}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Written review <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={body}
+                  onChange={e => setBody(e.target.value)}
+                  placeholder="Share your experience…"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none transition"
+                />
+              </div>
+              {error && (
+                <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={onClose}
+                  className="flex-1 rounded-xl py-3 text-sm font-bold border-2 border-gray-200 text-gray-600 hover:border-gray-300 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={rating === 0 || submitting}
+                  className="flex-1 rounded-xl py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  style={{ background: 'linear-gradient(90deg,#F59E0B,#FBBF24)' }}>
+                  {submitting ? 'Submitting…' : 'Submit review'}
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function BookingCard({
   booking,
   isHelper,
+  currentUserId,
   onUpdate,
+  onReview,
 }: {
   booking: BookingItem
   isHelper: boolean
+  currentUserId: string
   onUpdate: (id: string, status: string) => void
+  onReview: (booking: BookingItem) => void
 }) {
   const [updating, setUpdating] = useState(false)
   const meta = STATUS_META[booking.status] ?? STATUS_META.pending
@@ -182,6 +319,17 @@ function BookingCard({
           </button>
         </div>
       )}
+
+      {/* Completed: leave a review */}
+      {booking.status === 'completed' && !booking.has_review && (
+        <button onClick={() => onReview(booking)}
+          className="w-full rounded-xl py-2 text-sm font-bold border-2 border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors">
+          ★ Leave a review
+        </button>
+      )}
+      {booking.status === 'completed' && booking.has_review && (
+        <p className="text-center text-xs text-gray-400 py-1">✓ Review submitted</p>
+      )}
     </div>
   )
 }
@@ -211,7 +359,7 @@ const ClipboardIcon = (
   </svg>
 )
 
-export default function DashboardContent({ email, postCount, recentPosts, posted, role, bookings: initialBookings }: Props) {
+export default function DashboardContent({ email, postCount, recentPosts, posted, role, bookings: initialBookings, currentUserId }: Props) {
   const { t } = useLanguage()
   const firstName = email.split('@')[0]
   const isHelper = role === 'helper'
@@ -219,6 +367,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks'>('overview')
   const [bookings, setBookings] = useState<BookingItem[]>(initialBookings)
   const [activeFilter, setActiveFilter] = useState<FilterOption>('all')
+  const [reviewTarget, setReviewTarget] = useState<BookingItem | null>(null)
 
   function handleTabChange(tab: 'overview' | 'tasks') {
     setActiveTab(tab)
@@ -227,6 +376,10 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
 
   function handleBookingUpdate(id: string, status: string) {
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b))
+  }
+
+  function handleReviewDone(bookingId: string) {
+    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, has_review: true } : b))
   }
 
   const pendingCount = bookings.filter(b => b.status === 'pending').length
@@ -239,6 +392,15 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8 w-full">
+      {reviewTarget && (
+        <ReviewModal
+          booking={reviewTarget}
+          currentUserId={currentUserId}
+          isHelper={isHelper}
+          onClose={() => setReviewTarget(null)}
+          onDone={handleReviewDone}
+        />
+      )}
       {posted && (
         <div className="mb-6 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -382,7 +544,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filteredBookings.map(b => (
-                    <BookingCard key={b.id} booking={b} isHelper={true} onUpdate={handleBookingUpdate} />
+                    <BookingCard key={b.id} booking={b} isHelper={true} currentUserId={currentUserId} onUpdate={handleBookingUpdate} onReview={setReviewTarget} />
                   ))}
                 </div>
               )}
@@ -481,7 +643,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {filteredBookings.map(b => (
-                      <BookingCard key={b.id} booking={b} isHelper={false} onUpdate={handleBookingUpdate} />
+                      <BookingCard key={b.id} booking={b} isHelper={false} currentUserId={currentUserId} onUpdate={handleBookingUpdate} onReview={setReviewTarget} />
                     ))}
                   </div>
                 )}

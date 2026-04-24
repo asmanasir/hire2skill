@@ -22,6 +22,7 @@ export type BookingItem = {
   helper_id: string
   other_display_name: string | null
   other_avatar_url: string | null
+  has_review: boolean
 }
 
 export default async function DashboardPage({
@@ -65,6 +66,7 @@ export default async function DashboardPage({
           ...b,
           other_display_name: map[b.poster_id]?.display_name ?? null,
           other_avatar_url: map[b.poster_id]?.avatar_url ?? null,
+          has_review: false,
         }))
       }
     } else {
@@ -84,11 +86,26 @@ export default async function DashboardPage({
           ...b,
           other_display_name: map[b.helper_id]?.display_name ?? null,
           other_avatar_url: map[b.helper_id]?.avatar_url ?? null,
+          has_review: false,
         }))
       }
     }
   } catch {
     // bookings table not yet created — degrade gracefully
+  }
+
+  // Mark which completed bookings the current user has already reviewed
+  try {
+    const completedIds = bookings.filter(b => b.status === 'completed').map(b => b.id)
+    if (completedIds.length > 0) {
+      const { data: done } = await supabase
+        .from('reviews').select('booking_id')
+        .eq('reviewer_id', user.id).in('booking_id', completedIds)
+      const reviewed = new Set((done ?? []).map(r => r.booking_id))
+      bookings = bookings.map(b => ({ ...b, has_review: reviewed.has(b.id) }))
+    }
+  } catch {
+    // reviews table not yet created
   }
 
   const pendingCount = bookings.filter(b => b.status === 'pending').length
@@ -102,6 +119,7 @@ export default async function DashboardPage({
       role={role}
       bookings={bookings}
       pendingCount={pendingCount}
+      currentUserId={user.id}
     />
   )
 }
