@@ -33,11 +33,21 @@ function isElite(t: Tasker) {
 }
 
 const CATEGORIES = [
-  'All', 'Cleaning', 'Moving', 'Tutoring', 'Delivery', 'Handyman', 'Events',
-  'IT & Tech', 'Gardening', 'Pet Care', 'Cooking', 'Shopping', 'Knitting',
-  'Sewing', 'Kids Care', 'Car Wash', 'Painting', 'Makeup Artist', 'Hair Dresser',
-  'Snow Removal', 'Dog Walking', 'Furniture Assembly', 'Window Cleaning',
-  'Photography', 'Personal Training', 'Elder Care', 'Music Lessons',
+  'All',
+  // Home & Cleaning
+  'Cleaning', 'Window Cleaning', 'Painting', 'Gardening', 'Snow Removal',
+  // Handyman
+  'Handyman', 'Furniture Assembly',
+  // Moving
+  'Moving', 'Delivery',
+  // Tech
+  'IT & Tech',
+  // People & Care
+  'Tutoring', 'Driving Lessons', 'Kids Care', 'Elder Care', 'Personal Training', 'Music Lessons', 'Dog Walking', 'Pet Care',
+  // Events & Lifestyle
+  'Events', 'Photography', 'Cooking', 'Baking', 'Shopping',
+  // Beauty & Crafts
+  'Makeup Artist', 'Hair Dresser', 'Knitting', 'Sewing', 'Car Wash',
 ]
 
 type CatMeta = { bg: string; color: string; Icon: React.ElementType }

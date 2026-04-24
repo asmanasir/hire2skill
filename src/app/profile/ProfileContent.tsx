@@ -983,7 +983,7 @@ export default function ProfileContent({
 
             {/* ─── VERIFICATION ─── */}
             {tab === 'verification' && (
-              <VerificationTab profile={profile} userId={user.id} />
+              <VerificationTab profile={init} userId={user.id} />
             )}
 
             {/* ─── DELETE ACCOUNT ─── */}

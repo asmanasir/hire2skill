@@ -1,9 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import webpush from 'web-push'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 const FROM = 'SkillLink <no-reply@skilllink.no>'
+
+webpush.setVapidDetails(
+  'mailto:support@skilllink.no',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!,
+)
+
+type PushSub = { endpoint: string; p256dh: string; auth: string }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sendPush(userId: string, admin: any, payload: { title: string; body: string; url: string }) {
+  try {
+    const { data } = await admin
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .eq('user_id', userId)
+    const subs = (data ?? []) as PushSub[]
+    if (!subs.length) return
+    await Promise.allSettled(
+      subs.map((s) =>
+        webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          JSON.stringify(payload),
+        )
+      ),
+    )
+  } catch {}
+}
 
 function layout(body: string) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
@@ -60,13 +89,20 @@ export async function POST(req: NextRequest) {
       if (!helperEmail) return NextResponse.json({ ok: true })
       const posterName = poster?.display_name ?? 'Someone'
       const subject = `New task request from ${posterName}`
-      await sendEmail(helperEmail, subject, layout(`
-        <p style="margin:0 0 16px;">
-          <strong>${posterName}</strong> has sent you a booking request on SkillLink.
-        </p>
-        <p>Log in to accept or decline.</p>
-        ${btn('View Request', `${APP_URL}/dashboard`)}
-      `))
+      await Promise.all([
+        sendEmail(helperEmail, subject, layout(`
+          <p style="margin:0 0 16px;">
+            <strong>${posterName}</strong> has sent you a booking request on SkillLink.
+          </p>
+          <p>Log in to accept or decline.</p>
+          ${btn('View Request', `${APP_URL}/dashboard`)}
+        `)),
+        sendPush(bookingData.helper_id, supabase, {
+          title: `New request from ${posterName}`,
+          body: 'Tap to view and accept the booking.',
+          url: '/dashboard',
+        }),
+      ])
     }
 
     else if (type === 'booking-accepted') {
@@ -80,13 +116,20 @@ export async function POST(req: NextRequest) {
       if (!posterEmail) return NextResponse.json({ ok: true })
       const helperName = helper?.display_name ?? 'Your helper'
       const subject = `${helperName} accepted your request!`
-      await sendEmail(posterEmail, subject, layout(`
-        <p style="margin:0 0 16px;">
-          <strong>${helperName}</strong> accepted your booking request on SkillLink.
-        </p>
-        <p>You can now chat with ${helperName}.</p>
-        ${btn('Open Chat', `${APP_URL}/chat/${bookingData.id}`)}
-      `))
+      await Promise.all([
+        sendEmail(posterEmail, subject, layout(`
+          <p style="margin:0 0 16px;">
+            <strong>${helperName}</strong> accepted your booking request on SkillLink.
+          </p>
+          <p>You can now chat with ${helperName}.</p>
+          ${btn('Open Chat', `${APP_URL}/chat/${bookingData.id}`)}
+        `)),
+        sendPush(bookingData.poster_id, supabase, {
+          title: `${helperName} accepted your booking!`,
+          body: 'Tap to open the chat.',
+          url: `/chat/${bookingData.id}`,
+        }),
+      ])
     }
 
     else if (type === 'new-message') {
@@ -103,13 +146,20 @@ export async function POST(req: NextRequest) {
       if (!recipientEmail) return NextResponse.json({ ok: true })
       const senderName = sender?.display_name ?? 'Someone'
       const subject = `New message from ${senderName}`
-      await sendEmail(recipientEmail, subject, layout(`
-        <p style="margin:0 0 8px;">You have a new message from <strong>${senderName}</strong>.</p>
-        ${preview ? `<blockquote style="margin:16px 0;padding:12px 16px;background:#f4f4f5;
-          border-left:3px solid #8b5cf6;border-radius:0 6px 6px 0;color:#3f3f46;font-style:italic;">
-          "${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}"</blockquote>` : ''}
-        ${btn('Reply', `${APP_URL}/chat/${msgBookingId}`)}
-      `))
+      await Promise.all([
+        sendEmail(recipientEmail, subject, layout(`
+          <p style="margin:0 0 8px;">You have a new message from <strong>${senderName}</strong>.</p>
+          ${preview ? `<blockquote style="margin:16px 0;padding:12px 16px;background:#f4f4f5;
+            border-left:3px solid #8b5cf6;border-radius:0 6px 6px 0;color:#3f3f46;font-style:italic;">
+            "${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}"</blockquote>` : ''}
+          ${btn('Reply', `${APP_URL}/chat/${msgBookingId}`)}
+        `)),
+        sendPush(recipientId, supabase, {
+          title: `${senderName} sent you a message`,
+          body: preview ? preview.slice(0, 100) : 'Tap to reply.',
+          url: `/chat/${msgBookingId}`,
+        }),
+      ])
     }
 
     return NextResponse.json({ ok: true })

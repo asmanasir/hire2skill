@@ -53,8 +53,8 @@ export default async function Navbar() {
               <div className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full text-white text-sm font-bold shadow-sm" style={{ background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)' }}>
                 {user.email?.[0].toUpperCase()}
               </div>
-              <form action="/auth/signout" method="post">
-                <button type="submit" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                  <form action="/auth/signout" method="post">
+                <button type="submit" className="hidden sm:block rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                   Log out
                 </button>
               </form>
@@ -76,7 +76,7 @@ export default async function Navbar() {
 
           <Link
             href="/post"
-            className="rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+            className="hidden sm:block rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
             style={{ background: 'linear-gradient(90deg,#F59E0B,#FBBF24)' }}
           >
             Post a Job

@@ -1,19 +1,23 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { LanguageProvider } from "@/context/LanguageContext";
+import type { Metadata, Viewport } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import './globals.css'
+import Navbar from '@/components/Navbar'
+import Footer from '@/components/Footer'
+import MobileBottomNav from '@/components/MobileBottomNav'
+import PWARegister from '@/components/PWARegister'
+import { LanguageProvider } from '@/context/LanguageContext'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const viewport: Viewport = {
+  themeColor: '#1E3A8A',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://skilllink.no'),
@@ -23,6 +27,13 @@ export const metadata: Metadata = {
   },
   description: 'SkillLink connects you with verified local helpers across Norway. Book cleaners, movers, tutors, handymen and more — fast and easy.',
   keywords: ['local helpers Norway', 'hire cleaner Oslo', 'find handyman Bergen', 'tutoring Norway', 'SkillLink'],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SkillLink',
+  },
+  formatDetection: { telephone: false },
   openGraph: {
     siteName: 'SkillLink',
     type: 'website',
@@ -34,25 +45,26 @@ export const metadata: Metadata = {
     site: '@skilllink_no',
   },
   robots: { index: true, follow: true },
-};
+}
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-512.svg" />
+      </head>
       <body className="min-h-full flex flex-col">
-          <LanguageProvider>
-            <Navbar />
+        <LanguageProvider>
+          <Navbar />
+          {/* pb-16 on mobile reserves space for the fixed bottom nav */}
+          <div className="flex-1 flex flex-col pb-16 sm:pb-0">
             {children}
             <Footer />
-          </LanguageProvider>
-        </body>
+          </div>
+          <MobileBottomNav />
+          <PWARegister />
+        </LanguageProvider>
+      </body>
     </html>
-  );
+  )
 }
