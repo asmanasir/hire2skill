@@ -2,6 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardContent from './DashboardContent'
 
+export type Post = {
+  id: string
+  title: string
+  category: string
+  location: string
+  status: string
+  created_at: string
+}
+
 export type BookingItem = {
   id: string
   created_at: string
@@ -29,8 +38,8 @@ export default async function DashboardPage({
 
   const [{ count: postCount }, { data: recentPosts }, { data: profile }] = await Promise.all([
     supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-    supabase.from('posts').select('id, title, category, location, created_at')
-      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+    supabase.from('posts').select('id, title, category, location, status, created_at')
+      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(30),
     supabase.from('profiles').select('role').eq('id', user.id).single(),
   ])
 
