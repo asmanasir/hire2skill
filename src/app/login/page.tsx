@@ -20,13 +20,20 @@ export default function LoginPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message)
       setLoading(false)
     } else {
-      window.location.href = '/onboarding'
+      // If they already completed onboarding (profile exists) go to dashboard, else onboarding
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      window.location.href = profile ? '/dashboard' : '/onboarding'
     }
   }
 

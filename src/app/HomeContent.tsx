@@ -2,6 +2,12 @@
 
 import Link from 'next/link'
 import { useLanguage } from '@/context/LanguageContext'
+import {
+  SprayCan, Truck, GraduationCap, Package, Wrench, PartyPopper, Monitor, Leaf,
+  PawPrint, ChefHat, ShoppingBag, Wind, Scissors, Baby, Car, PaintBucket,
+  Paintbrush, Wand2, Snowflake, Dog, Sofa, AppWindow, Camera, Dumbbell,
+  HeartHandshake, Music,
+} from 'lucide-react'
 
 type Job = { title: string; location: string; price: number | null; category: string; urgent?: boolean }
 
@@ -34,79 +40,34 @@ function Stars({ rating }: { rating: number }) {
 }
 
 // ── Category icon map ───────────────────────────────────────────────────────
-const CAT_ICONS: Record<string, { bg: string; fg: string; icon: React.ReactNode }> = {
-  cleaning: {
-    bg: '#F0FDF4', fg: '#16A34A',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/><path d="M5 3v4M19 17v4M3 5h4M17 19h4"/></svg>,
-  },
-  moving: {
-    bg: '#EFF6FF', fg: '#2563EB',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
-  },
-  tutoring: {
-    bg: '#FFFBEB', fg: '#D97706',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>,
-  },
-  delivery: {
-    bg: '#FFF7ED', fg: '#EA580C',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
-  },
-  handyman: {
-    bg: '#F5F3FF', fg: '#7C3AED',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
-  },
-  events: {
-    bg: '#FFF1F2', fg: '#E11D48',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E11D48" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>,
-  },
-  it: {
-    bg: '#F0F9FF', fg: '#0284C7',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0284C7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>,
-  },
-  gardening: {
-    bg: '#F0FDF4', fg: '#15803D',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22V12M12 12C12 7 8 4 3 5c0 5 3 9 9 7M12 12c0-5 4-8 9-7-1 5-4 9-9 7"/></svg>,
-  },
-  petcare: {
-    bg: '#FFF7ED', fg: '#F97316',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="5.5" r="1.8"/><circle cx="16.5" cy="5.5" r="1.8"/><circle cx="4.5" cy="11" r="1.8"/><circle cx="19.5" cy="11" r="1.8"/><path d="M12 21c-3.5 0-6-2-6-5 0-1.5.5-2.8 2-4h8c1.5 1.2 2 2.5 2 4 0 3-2.5 5-6 5z"/></svg>,
-  },
-  cooking: {
-    bg: '#FEF2F2', fg: '#DC2626',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3z"/><path d="M21 15v7"/></svg>,
-  },
-  shopping: {
-    bg: '#F5F3FF', fg: '#8B5CF6',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
-  },
-  knitting: {
-    bg: '#FDF4FF', fg: '#C026D3',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C026D3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="14" r="6"/><path d="M8 8L4 2"/><path d="M16 8L20 2"/><path d="M6 14Q9 11 12 14Q15 17 18 14"/></svg>,
-  },
-  sewing: {
-    bg: '#ECFEFF', fg: '#0891B2',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0891B2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>,
-  },
-  kidscare: {
-    bg: '#FEFCE8', fg: '#CA8A04',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CA8A04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1" fill="#CA8A04"/><circle cx="15" cy="9" r="1" fill="#CA8A04"/></svg>,
-  },
-  carwash: {
-    bg: '#F0F9FF', fg: '#0EA5E9',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14L7 8h10l3 6H4z"/><line x1="3" y1="14" x2="21" y2="14"/><circle cx="7.5" cy="18" r="2"/><circle cx="16.5" cy="18" r="2"/><path d="M8 3v3M12 2v3M16 3v3"/></svg>,
-  },
-  painting: {
-    bg: '#EEF2FF', fg: '#4F46E5',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="7" rx="2"/><path d="M12 10v5"/><path d="M9 15h6"/><path d="M9 15v6M15 15v6"/></svg>,
-  },
-  makeup: {
-    bg: '#FDF2F8', fg: '#DB2777',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DB2777" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 20V9l2-5 2 5v11H10z"/><path d="M8 20h8"/><path d="M10 13h4"/></svg>,
-  },
-  hairdresser: {
-    bg: '#F3E8FF', fg: '#7E22CE',
-    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7E22CE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="5" rx="2"/><path d="M6 8v11M10 8v11M14 8v11M18 8v11"/><path d="M3 19h18"/></svg>,
-  },
+type CatIconEntry = { bg: string; fg: string; Icon: React.ElementType }
+const CAT_ICONS: Record<string, CatIconEntry> = {
+  cleaning:          { bg: '#F0FDF4', fg: '#16A34A', Icon: SprayCan },
+  moving:            { bg: '#EFF6FF', fg: '#2563EB', Icon: Truck },
+  tutoring:          { bg: '#FFFBEB', fg: '#D97706', Icon: GraduationCap },
+  delivery:          { bg: '#FFF7ED', fg: '#EA580C', Icon: Package },
+  handyman:          { bg: '#F5F3FF', fg: '#7C3AED', Icon: Wrench },
+  events:            { bg: '#FFF1F2', fg: '#E11D48', Icon: PartyPopper },
+  it:                { bg: '#F0F9FF', fg: '#0284C7', Icon: Monitor },
+  gardening:         { bg: '#F0FDF4', fg: '#15803D', Icon: Leaf },
+  petcare:           { bg: '#FFF7ED', fg: '#F97316', Icon: PawPrint },
+  cooking:           { bg: '#FEF2F2', fg: '#DC2626', Icon: ChefHat },
+  shopping:          { bg: '#F5F3FF', fg: '#8B5CF6', Icon: ShoppingBag },
+  knitting:          { bg: '#FDF4FF', fg: '#C026D3', Icon: Wind },
+  sewing:            { bg: '#ECFEFF', fg: '#0891B2', Icon: Scissors },
+  kidscare:          { bg: '#FEFCE8', fg: '#CA8A04', Icon: Baby },
+  carwash:           { bg: '#F0F9FF', fg: '#0EA5E9', Icon: Car },
+  painting:          { bg: '#EEF2FF', fg: '#4F46E5', Icon: PaintBucket },
+  makeup:            { bg: '#FDF2F8', fg: '#DB2777', Icon: Paintbrush },
+  hairdresser:       { bg: '#F3E8FF', fg: '#7E22CE', Icon: Wand2 },
+  snowremoval:       { bg: '#EFF6FF', fg: '#0369A1', Icon: Snowflake },
+  dogwalking:        { bg: '#FEF9C3', fg: '#92400E', Icon: Dog },
+  furnitureassembly: { bg: '#F5F3FF', fg: '#6D28D9', Icon: Sofa },
+  windowcleaning:    { bg: '#ECFEFF', fg: '#0E7490', Icon: AppWindow },
+  photography:       { bg: '#FFF1F2', fg: '#BE123C', Icon: Camera },
+  personaltraining:  { bg: '#F0FDF4', fg: '#166534', Icon: Dumbbell },
+  eldercare:         { bg: '#FFF7ED', fg: '#C2410C', Icon: HeartHandshake },
+  musiclessons:      { bg: '#EEF2FF', fg: '#4338CA', Icon: Music },
 }
 
 // ── Sample tasker profiles (displayed as helpers) ───────────────────────────
@@ -123,6 +84,7 @@ function TaskCard({ job, bookLabel, negotiableLabel }: { job: Job; bookLabel: st
   const initials = job.title.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
   const color = AVATAR_COLORS[Math.abs(job.title.charCodeAt(0)) % AVATAR_COLORS.length]
   const cat = CAT_ICONS[job.category.toLowerCase()] ?? CAT_ICONS.handyman
+  const CatIcon = cat.Icon
 
   return (
     <Link href="/signup" className="group flex flex-col rounded-2xl bg-white border border-gray-200 p-5 hover:border-blue-400 hover:shadow-xl transition-all duration-200">
@@ -140,7 +102,7 @@ function TaskCard({ job, bookLabel, negotiableLabel }: { job: Job; bookLabel: st
           </div>
         </div>
         <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: cat.bg }}>
-          {cat.icon}
+          <CatIcon size={18} color={cat.fg} strokeWidth={1.75} />
         </div>
       </div>
 
@@ -171,6 +133,7 @@ function TaskCard({ job, bookLabel, negotiableLabel }: { job: Job; bookLabel: st
 // ── Tasker profile card ─────────────────────────────────────────────────────
 function TaskerCard({ tasker, bookLabel, replyLabel, doneLabel }: { tasker: typeof SAMPLE_TASKERS[0]; bookLabel: string; replyLabel: string; doneLabel: string }) {
   const cat = CAT_ICONS[tasker.category] ?? CAT_ICONS.handyman
+  const CatIcon = cat.Icon
   return (
     <Link href="/signup" className="group flex flex-col rounded-2xl bg-white border border-gray-200 p-5 hover:border-blue-400 hover:shadow-xl transition-all duration-200">
       <div className="flex items-center gap-3 mb-3">
@@ -192,7 +155,7 @@ function TaskerCard({ tasker, bookLabel, replyLabel, doneLabel }: { tasker: type
           </div>
         </div>
         <div className="ml-auto h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: cat.bg }}>
-          {cat.icon}
+          <CatIcon size={20} color={cat.fg} strokeWidth={1.75} />
         </div>
       </div>
 
@@ -231,7 +194,12 @@ export default function HomeContent({ jobs, totalJobs }: { jobs: Job[]; totalJob
 
   if (!h || !how1 || !how2 || !how3) return null
 
-  const catKeys = ['cleaning', 'moving', 'tutoring', 'delivery', 'handyman', 'events', 'it', 'gardening', 'petcare', 'cooking', 'shopping', 'knitting', 'sewing', 'kidscare', 'carwash', 'painting', 'makeup', 'hairdresser'] as const
+  const catKeys = [
+    'cleaning', 'moving', 'tutoring', 'delivery', 'handyman', 'events', 'it', 'gardening',
+    'petcare', 'cooking', 'shopping', 'knitting', 'sewing', 'kidscare', 'carwash', 'painting',
+    'makeup', 'hairdresser', 'snowremoval', 'dogwalking', 'furnitureassembly', 'windowcleaning',
+    'photography', 'personaltraining', 'eldercare', 'musiclessons',
+  ] as const
 
   const HOW_STEPS = [
     {
@@ -328,11 +296,26 @@ export default function HomeContent({ jobs, totalJobs }: { jobs: Job[]; totalJob
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {catKeys.map(key => {
             const cfg = CAT_ICONS[key]
+            const CatIcon = cfg.Icon
+            const catLabel = key === 'it' ? 'IT & Tech'
+              : key === 'petcare' ? 'Pet Care'
+              : key === 'kidscare' ? 'Kids Care'
+              : key === 'carwash' ? 'Car Wash'
+              : key === 'hairdresser' ? 'Hair Dresser'
+              : key === 'makeup' ? 'Makeup Artist'
+              : key === 'snowremoval' ? 'Snow Removal'
+              : key === 'dogwalking' ? 'Dog Walking'
+              : key === 'furnitureassembly' ? 'Furniture Assembly'
+              : key === 'windowcleaning' ? 'Window Cleaning'
+              : key === 'personaltraining' ? 'Personal Training'
+              : key === 'eldercare' ? 'Elder Care'
+              : key === 'musiclessons' ? 'Music Lessons'
+              : key.charAt(0).toUpperCase() + key.slice(1)
             return (
-              <Link key={key} href="/taskers"
+              <Link key={key} href={`/taskers?category=${encodeURIComponent(catLabel)}`}
                 className="group flex flex-col items-center gap-2.5 rounded-2xl bg-white border border-gray-200 px-3 py-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 text-center">
                 <div className="h-12 w-12 rounded-xl flex items-center justify-center shadow-sm" style={{ background: cfg.bg }}>
-                  {cfg.icon}
+                  <CatIcon size={24} color={cfg.fg} strokeWidth={1.75} />
                 </div>
                 <span className="text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors leading-tight">
                   {h.cat[key as keyof typeof h.cat]}

@@ -35,6 +35,17 @@ type Post = {
   created_at: string
 }
 
+type Review = {
+  id: string
+  rating: number
+  text: string
+  created_at: string
+  reviewer_name: string | null
+  reviewer_avatar: string | null
+}
+
+type RoleType = 'poster' | 'helper'
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -54,6 +65,8 @@ const SERVICE_CATEGORIES = [
   'Cleaning','Moving','Tutoring','Delivery','Handyman','Events',
   'IT & Tech','Gardening','Pet Care','Cooking','Shopping','Knitting',
   'Sewing','Kids Care','Car Wash','Painting','Makeup Artist','Hair Dresser',
+  'Snow Removal','Dog Walking','Furniture Assembly','Window Cleaning',
+  'Photography','Personal Training','Elder Care','Music Lessons',
 ]
 
 const AVATAR_COLORS = ['#2563EB','#16A34A','#7C3AED','#D97706','#E11D48','#0284C7']
@@ -131,6 +144,19 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-sm font-semibold text-gray-700 mb-1.5">{children}</label>
 }
 
+function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      {[1,2,3,4,5].map(i => (
+        <svg key={i} width={size} height={size} viewBox="0 0 24 24"
+          fill={i <= Math.round(rating) ? '#F59E0B' : '#E5E7EB'}>
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+      ))}
+    </span>
+  )
+}
+
 function TextInput({ value, onChange, placeholder, readOnly, type = 'text' }: {
   value: string; onChange?: (v: string) => void; placeholder?: string; readOnly?: boolean; type?: string
 }) {
@@ -151,10 +177,12 @@ export default function ProfileContent({
   user,
   profile: init,
   posts: initPosts,
+  reviews,
 }: {
   user: UserInfo
   profile: Profile | null
   posts: Post[]
+  reviews: Review[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState('profile')
@@ -166,6 +194,8 @@ export default function ProfileContent({
   const [rate, setRate]           = useState(String(init?.hourly_rate ?? ''))
   const [cats, setCats]           = useState<string[]>(init?.categories ?? [])
   const [avatar, setAvatar]       = useState<string | null>(init?.avatar_url ?? null)
+  const [role,   setRole]         = useState<RoleType>((init?.role as RoleType) ?? 'poster')
+  const [avatarErr, setAvatarErr] = useState('')
   const [profSaving, setProfSaving] = useState(false)
   const [profSaved,  setProfSaved]  = useState(false)
   const fileRef  = useRef<HTMLInputElement>(null)
@@ -246,20 +276,20 @@ export default function ProfileContent({
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   async function uploadAvatar(file: File) {
+    setAvatarErr('')
     const sb  = createClient()
     const ext = file.name.split('.').pop()
     const path = `${user.id}/avatar.${ext}`
     const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true })
-    if (!error) {
-      const { data } = sb.storage.from('avatars').getPublicUrl(path)
-      setAvatar(data.publicUrl)
-    }
+    if (error) { setAvatarErr('Upload failed — make sure the "avatars" bucket exists in Supabase Storage.'); return }
+    const { data } = sb.storage.from('avatars').getPublicUrl(path)
+    setAvatar(data.publicUrl)
   }
 
   async function saveProfile() {
     setProfSaving(true)
     await createClient().from('profiles').upsert({
-      id: user.id, display_name: name, bio, location,
+      id: user.id, role, display_name: name, bio, location,
       hourly_rate: rate ? Number(rate) : null, categories: cats, avatar_url: avatar,
     })
     setProfSaving(false); setProfSaved(true)
@@ -364,7 +394,7 @@ export default function ProfileContent({
           </aside>
 
           {/* ── Content panel ── */}
-          <main className="flex-1 bg-white rounded-2xl border border-gray-200 p-8 min-h-[540px]">
+          <main className="flex-1 bg-white rounded-2xl border border-gray-200 p-8 min-h-135">
 
             {/* ─── PROFILE ─── */}
             {tab === 'profile' && (
@@ -399,6 +429,40 @@ export default function ProfileContent({
                       className="mt-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
                       Change photo
                     </button>
+                  </div>
+                </div>
+
+                {avatarErr && (
+                  <p className="mb-4 text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{avatarErr}</p>
+                )}
+
+                {/* Role switcher */}
+                <div className="mb-6">
+                  <FieldLabel>Account type</FieldLabel>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {([
+                      { key: 'poster', label: 'Task Poster', sub: 'I need help',
+                        icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/><path d="M9 10h6"/></svg>,
+                        active: 'border-blue-500 bg-blue-50 text-blue-700', iconBg: 'bg-blue-100 text-blue-600' },
+                      { key: 'helper', label: 'Helper', sub: 'I can help',
+                        icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>,
+                        active: 'border-green-500 bg-green-50 text-green-700', iconBg: 'bg-green-100 text-green-600' },
+                    ] as const).map(opt => (
+                      <button key={opt.key} type="button" onClick={() => setRole(opt.key as RoleType)}
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                          role === opt.key ? opt.active : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}>
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                          role === opt.key ? opt.iconBg : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {opt.icon}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold">{opt.label}</p>
+                          <p className="text-xs opacity-60">{opt.sub}</p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -448,7 +512,7 @@ export default function ProfileContent({
                     </div>
                   </div>
 
-                  {init?.role === 'helper' && (
+                  {role === 'helper' && (
                     <>
                       <div><FieldLabel>Hourly rate (NOK)</FieldLabel><TextInput type="number" value={rate} onChange={setRate} placeholder="e.g. 350" /></div>
                       <div>
@@ -472,7 +536,66 @@ export default function ProfileContent({
                 </div>
 
                 <SaveBar saving={profSaving} saved={profSaved} onSave={saveProfile}
-                  onCancel={() => { setName(init?.display_name ?? ''); setBio(init?.bio ?? ''); setLocation(init?.location ?? ''); setRate(String(init?.hourly_rate ?? '')); setCats(init?.categories ?? []) }} />
+                  onCancel={() => {
+                    setName(init?.display_name ?? ''); setBio(init?.bio ?? '')
+                    setLocation(init?.location ?? ''); setRate(String(init?.hourly_rate ?? ''))
+                    setCats(init?.categories ?? []); setRole((init?.role as RoleType) ?? 'poster')
+                    setAvatarErr('')
+                  }} />
+
+                {/* ── Reviews received ── */}
+                <div className="mt-10 pt-8 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-base font-extrabold text-gray-900">Reviews received</h2>
+                    {reviews.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Stars rating={reviews.reduce((s, r) => s + r.rating, 0) / reviews.length} size={15} />
+                        <span className="text-sm font-bold text-gray-900">
+                          {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                        </span>
+                        <span className="text-xs text-gray-400">({reviews.length} reviews)</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-400 mb-5">Reviews left for you by people you helped.</p>
+
+                  {reviews.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center rounded-xl bg-gray-50 border border-gray-100">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-3">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                      </svg>
+                      <p className="text-sm font-semibold text-gray-500">No reviews yet</p>
+                      <p className="text-xs text-gray-400 mt-1">Reviews will appear here after you complete tasks.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {reviews.map((rev, i) => (
+                        <div key={rev.id} className={i < reviews.length - 1 ? 'pb-5 border-b border-gray-100' : ''}>
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div className="flex items-center gap-3">
+                              {rev.reviewer_avatar ? (
+                                <img src={rev.reviewer_avatar} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                              ) : (
+                                <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                                  style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
+                                  {(rev.reviewer_name ?? 'A')[0].toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-sm font-bold text-gray-900">{rev.reviewer_name ?? 'Anonymous'}</p>
+                                <p className="text-xs text-gray-400">
+                                  {new Date(rev.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                              </div>
+                            </div>
+                            <Stars rating={rev.rating} size={13} />
+                          </div>
+                          <p className="text-sm text-gray-600 leading-relaxed pl-12">{rev.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
