@@ -68,7 +68,7 @@ function TaskCard({ job, bookLabel, negotiableLabel }: { job: Job; bookLabel: st
   const CatIcon = cat.Icon
 
   return (
-    <Link href="/signup" className="group flex flex-col rounded-2xl bg-white border border-gray-200 p-5 hover:border-blue-400 hover:shadow-xl transition-all duration-200">
+    <Link href="/jobs" className="group flex flex-col rounded-2xl bg-white border border-gray-200 p-5 hover:border-blue-400 hover:shadow-xl transition-all duration-200">
       {/* Header: avatar + info */}
       <div className="flex items-start gap-4 mb-4">
         <div className="h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 text-white font-bold text-sm shadow-sm"

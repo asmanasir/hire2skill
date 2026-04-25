@@ -10,6 +10,24 @@ export type ChatMessage = {
   read_at: string | null
 }
 
+export type BookingThreadMeta = {
+  status: string
+  budget: number | null
+  message: string | null
+  poster_id: string
+  helper_id: string
+  post_id: string | null
+  post_title: string | null
+  post_category: string | null
+  post_location: string | null
+}
+
+function extractJobRefId(text: string | null | undefined): string | null {
+  if (!text) return null
+  const m = text.match(/^\s*\[JOB:([0-9a-f-]{36})\]/i)
+  return m?.[1] ?? null
+}
+
 export default async function ChatThreadPage({
   params,
 }: {
@@ -22,7 +40,7 @@ export default async function ChatThreadPage({
 
   const { data: booking } = await supabase
     .from('bookings')
-    .select('id, poster_id, helper_id, status')
+    .select('id, poster_id, helper_id, status, message, budget, post_id')
     .eq('id', bookingId)
     .single()
 
@@ -31,14 +49,18 @@ export default async function ChatThreadPage({
   }
 
   const otherId = booking.poster_id === user.id ? booking.helper_id : booking.poster_id
+  const jobId = booking.post_id ?? extractJobRefId((booking as { message?: string | null }).message ?? null)
 
-  const [{ data: otherProfile }, { data: initialMessages }] = await Promise.all([
+  const [{ data: otherProfile }, { data: initialMessages }, { data: post }] = await Promise.all([
     supabase.from('profiles').select('id, display_name, avatar_url').eq('id', otherId).single(),
     supabase.from('messages')
       .select('id, created_at, sender_id, body, read_at')
       .eq('booking_id', bookingId)
       .order('created_at', { ascending: true })
       .limit(100),
+    jobId
+      ? supabase.from('posts').select('id, title, category, location').eq('id', jobId).maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
 
   // Mark received unread messages as read on open
@@ -53,6 +75,18 @@ export default async function ChatThreadPage({
       .in('id', unreadIds)
   }
 
+  const bookingMeta: BookingThreadMeta = {
+    status: booking.status,
+    budget: (booking as { budget?: number | null }).budget ?? null,
+    message: (booking as { message?: string | null }).message ?? null,
+    poster_id: booking.poster_id,
+    helper_id: booking.helper_id,
+    post_id: jobId ?? null,
+    post_title: post?.title ?? null,
+    post_category: post?.category ?? null,
+    post_location: post?.location ?? null,
+  }
+
   return (
     <ChatThread
       bookingId={bookingId}
@@ -60,6 +94,7 @@ export default async function ChatThreadPage({
       otherName={otherProfile?.display_name ?? null}
       otherAvatar={otherProfile?.avatar_url ?? null}
       initialMessages={(initialMessages ?? []) as ChatMessage[]}
+      initialBooking={bookingMeta}
     />
   )
 }

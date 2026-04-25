@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
               "script-src 'self' 'unsafe-inline'",
-              "connect-src 'self' https://*.supabase.co https://api.resend.com https://nominatim.openstreetmap.org https://api.mapbox.com https://www.google.com https://maps.apple.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.supabase.net https://api.resend.com https://nominatim.openstreetmap.org https://api.mapbox.com https://www.google.com https://maps.apple.com",
               'upgrade-insecure-requests',
             ].join('; '),
           },

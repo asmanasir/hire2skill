@@ -83,6 +83,11 @@ export default function ChatContent({ conversations }: { conversations: Conversa
                     )}
                   </div>
                 </div>
+                {conv.status === 'pending' && conv.proposalTitle && (
+                  <p className="mt-1 text-[11px] text-amber-700 font-semibold truncate">
+                    Proposal: {conv.proposalTitle}
+                  </p>
+                )}
                 <p className={`text-xs mt-0.5 truncate ${conv.unreadCount > 0 ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
                   {conv.lastMessage ?? c.emptyMessageHint}
                 </p>

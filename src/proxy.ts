@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getPublicSupabaseEnv } from '@/lib/env/public'
 
+function resolveNextPath(raw: string | null): string | null {
+  if (!raw) return null
+  if (!raw.startsWith('/')) return null
+  if (raw.startsWith('//')) return null
+  return raw
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
   const { url, anonKey } = getPublicSupabaseEnv()
@@ -30,9 +37,10 @@ export async function proxy(request: NextRequest) {
   const protectedRoutes = ['/dashboard', '/post', '/chat', '/profile', '/onboarding']
   const authRoutes = ['/login', '/signup']
   const pathname = request.nextUrl.pathname
+  const nextPath = resolveNextPath(request.nextUrl.searchParams.get('next'))
 
   if (user && authRoutes.includes(pathname)) {
-    return NextResponse.redirect(new URL('/onboarding', request.url))
+    return NextResponse.redirect(new URL(nextPath ?? '/onboarding', request.url))
   }
 
   if (!user && protectedRoutes.some(route => pathname.startsWith(route))) {

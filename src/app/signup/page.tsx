@@ -3,15 +3,25 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/context/LanguageContext'
+
+function resolveNextPath(raw: string | null): string | null {
+  if (!raw) return null
+  if (!raw.startsWith('/')) return null
+  if (raw.startsWith('//')) return null
+  return raw
+}
 
 export default function SignupPage() {
   const { t } = useLanguage()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const nextPath = resolveNextPath(searchParams.get('next'))
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -20,10 +30,12 @@ export default function SignupPage() {
     setLoading(true)
 
     const supabase = createClient()
+    const callbackUrl = new URL('/auth/callback', window.location.origin)
+    if (nextPath) callbackUrl.searchParams.set('next', nextPath)
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: callbackUrl.toString() },
     })
 
     if (error) {
@@ -89,7 +101,7 @@ export default function SignupPage() {
 
         <p className="mt-6 text-center text-sm text-gray-500">
           {t.signup.hasAccount}{' '}
-          <Link href="/login" className="font-semibold text-blue-600 hover:underline">
+          <Link href={nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : '/login'} className="font-semibold text-blue-600 hover:underline">
             {t.signup.login}
           </Link>
         </p>

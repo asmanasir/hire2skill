@@ -552,16 +552,20 @@ export default function ProfileContent({
   profile: init,
   posts: initPosts,
   reviews,
+  initialTab,
 }: {
   user: UserInfo
   profile: Profile | null
   posts: Post[]
   reviews: Review[]
+  initialTab?: string | null
 }) {
   const { locale } = useLanguage()
   const saveUi = useMemo(() => getProfileSaveUi(locale), [locale])
   const router = useRouter()
-  const [tab, setTab] = useState('profile')
+  const initialTabKey =
+    initialTab && TABS.some((t) => t.key === initialTab) ? initialTab : 'profile'
+  const [tab, setTab] = useState(initialTabKey)
 
   // ── Profile tab state
   const [name, setName]           = useState(init?.display_name ?? '')
@@ -655,10 +659,6 @@ export default function ProfileContent({
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [])
-
-  useEffect(() => {
-    if (isProfDirty && profSaved) setProfSaved(false)
-  }, [isProfDirty, profSaved])
 
   function handleLocationChange(val: string) {
     setLocation(val)
@@ -1000,7 +1000,7 @@ export default function ProfileContent({
 
                 <SaveBar
                   saving={profSaving}
-                  saved={profSaved}
+                  saved={profSaved && !isProfDirty}
                   disabled={!isProfDirty}
                   saveLabel={saveUi.save}
                   savingLabel={saveUi.saving}

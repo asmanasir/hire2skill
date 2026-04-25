@@ -67,13 +67,23 @@ function btn(label: string, href: string) {
 }
 
 async function sendEmail(to: string, subject: string, html: string) {
-  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set')
+  if (!RESEND_API_KEY) return false
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: FROM, to, subject, html }),
   })
-  if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    const providerBody = await res.text()
+    logServerEvent('notify.email', 'warn', 'Email provider rejected request', {
+      status: res.status,
+      providerBody,
+    })
+    if (res.status === 401) throw new Error('EMAIL_PROVIDER_AUTH_FAILED')
+    if (res.status === 403) throw new Error('EMAIL_PROVIDER_SENDER_FORBIDDEN')
+    throw new Error(`EMAIL_PROVIDER_HTTP_${res.status}`)
+  }
+  return true
 }
 
 export async function POST(req: NextRequest) {
@@ -89,13 +99,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
-    if (!RESEND_API_KEY) {
-      return NextResponse.json({ error: 'Email service is not configured' }, { status: 503 })
+    let serviceEnv: { url: string; serviceRoleKey: string } | null = null
+    try {
+      serviceEnv = getSupabaseServiceEnv()
+    } catch (err) {
+      logServerEvent('notify.route', 'warn', 'Service role env missing; skipping email/push notify', {
+        error: String(err),
+      })
+      return NextResponse.json({ ok: true, skipped: 'missing_service_role' })
     }
-    if (!APP_URL) {
-      return NextResponse.json({ error: 'NEXT_PUBLIC_APP_URL is required in production' }, { status: 503 })
-    }
-    const { url, serviceRoleKey } = getSupabaseServiceEnv()
 
     const body = await req.json()
     const type = typeof body?.type === 'string' ? body.type : ''
@@ -105,14 +117,14 @@ export async function POST(req: NextRequest) {
     const msgBookingId = typeof body?.bookingId === 'string' ? body.bookingId : ''
     const preview = typeof body?.preview === 'string' ? body.preview.trim() : ''
 
-    if (!['new-booking', 'booking-accepted', 'new-message'].includes(type)) {
+    if (!['new-booking', 'booking-accepted', 'booking-declined', 'new-message'].includes(type)) {
       return NextResponse.json({ error: 'Invalid notification type' }, { status: 400 })
     }
 
     // Use service role to read emails
     const supabase = createClient(
-      url,
-      serviceRoleKey,
+      serviceEnv.url,
+      serviceEnv.serviceRoleKey,
     )
 
     if (type === 'new-booking') {
@@ -137,23 +149,26 @@ export async function POST(req: NextRequest) {
         supabase.from('profiles').select('display_name').eq('id', booking.poster_id).single(),
       ])
       const helperEmail = helperAuth?.user?.email
-      if (!helperEmail) return NextResponse.json({ ok: true })
       const posterName = sanitizeHtml(poster?.display_name ?? 'Someone')
       const subject = `New task request from ${posterName}`
-      await Promise.all([
-        sendEmail(helperEmail, subject, layout(`
+      const tasks: Promise<unknown>[] = []
+      if (helperEmail && APP_URL) {
+        tasks.push(sendEmail(helperEmail, subject, layout(`
           <p style="margin:0 0 16px;">
             <strong>${posterName}</strong> has sent you a booking request on Hire2Skill.
           </p>
           <p>Log in to accept or decline.</p>
           ${btn('View Request', `${APP_URL}/dashboard`)}
-        `)),
-        configurePush() ? sendPush(booking.helper_id, supabase, {
+        `)))
+      }
+      if (configurePush()) {
+        tasks.push(sendPush(booking.helper_id, supabase, {
           title: `New request from ${posterName}`,
           body: 'Tap to view and accept the booking.',
           url: '/dashboard',
-        }) : Promise.resolve(),
-      ])
+        }))
+      }
+      await Promise.all(tasks)
     }
 
     else if (type === 'booking-accepted') {
@@ -175,23 +190,67 @@ export async function POST(req: NextRequest) {
         supabase.from('profiles').select('display_name').eq('id', booking.helper_id).single(),
       ])
       const posterEmail = posterAuth?.user?.email
-      if (!posterEmail) return NextResponse.json({ ok: true })
       const helperName = sanitizeHtml(helper?.display_name ?? 'Your helper')
       const subject = `${helperName} accepted your request!`
-      await Promise.all([
-        sendEmail(posterEmail, subject, layout(`
+      const tasks: Promise<unknown>[] = []
+      if (posterEmail && APP_URL) {
+        tasks.push(sendEmail(posterEmail, subject, layout(`
           <p style="margin:0 0 16px;">
             <strong>${helperName}</strong> accepted your booking request on Hire2Skill.
           </p>
           <p>You can now chat with ${helperName}.</p>
           ${btn('Open Chat', `${APP_URL}/chat/${booking.id}`)}
-        `)),
-        configurePush() ? sendPush(booking.poster_id, supabase, {
+        `)))
+      }
+      if (configurePush()) {
+        tasks.push(sendPush(booking.poster_id, supabase, {
           title: `${helperName} accepted your booking!`,
           body: 'Tap to open the chat.',
           url: `/chat/${booking.id}`,
-        }) : Promise.resolve(),
+        }))
+      }
+      await Promise.all(tasks)
+    }
+
+    else if (type === 'booking-declined') {
+      const bookingIdForDecline = typeof bookingData?.id === 'string' ? bookingData.id : ''
+      if (!bookingIdForDecline) {
+        return NextResponse.json({ error: 'Missing booking id' }, { status: 400 })
+      }
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('id, poster_id, helper_id')
+        .eq('id', bookingIdForDecline)
+        .single()
+      if (!booking || booking.helper_id !== user.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const [{ data: posterAuth }, { data: helper }] = await Promise.all([
+        supabase.auth.admin.getUserById(booking.poster_id),
+        supabase.from('profiles').select('display_name').eq('id', booking.helper_id).single(),
       ])
+      const posterEmail = posterAuth?.user?.email
+      const helperName = sanitizeHtml(helper?.display_name ?? 'Your helper')
+      const subject = `${helperName} declined your request`
+      const tasks: Promise<unknown>[] = []
+      if (posterEmail && APP_URL) {
+        tasks.push(sendEmail(posterEmail, subject, layout(`
+          <p style="margin:0 0 16px;">
+            <strong>${helperName}</strong> declined your booking request on Hire2Skill.
+          </p>
+          <p>You can browse more helpers and send a new request anytime.</p>
+          ${btn('Find Helpers', `${APP_URL}/taskers`)}
+        `)))
+      }
+      if (configurePush()) {
+        tasks.push(sendPush(booking.poster_id, supabase, {
+          title: `${helperName} declined your request`,
+          body: 'Browse helpers to send a new request.',
+          url: '/taskers',
+        }))
+      }
+      await Promise.all(tasks)
     }
 
     else if (type === 'new-message') {
@@ -210,24 +269,27 @@ export async function POST(req: NextRequest) {
         supabase.from('profiles').select('display_name').eq('id', senderId).single(),
       ])
       const recipientEmail = recipientAuth?.user?.email
-      if (!recipientEmail) return NextResponse.json({ ok: true })
       const senderName = sanitizeHtml(sender?.display_name ?? 'Someone')
       const safePreview = sanitizeHtml(preview).slice(0, 120)
       const subject = `New message from ${senderName}`
-      await Promise.all([
-        sendEmail(recipientEmail, subject, layout(`
+      const tasks: Promise<unknown>[] = []
+      if (recipientEmail && APP_URL) {
+        tasks.push(sendEmail(recipientEmail, subject, layout(`
           <p style="margin:0 0 8px;">You have a new message from <strong>${senderName}</strong>.</p>
           ${safePreview ? `<blockquote style="margin:16px 0;padding:12px 16px;background:#f4f4f5;
             border-left:3px solid #8b5cf6;border-radius:0 6px 6px 0;color:#3f3f46;font-style:italic;">
             "${safePreview}${preview.length > 120 ? '…' : ''}"</blockquote>` : ''}
           ${btn('Reply', `${APP_URL}/chat/${msgBookingId}`)}
-        `)),
-        configurePush() ? sendPush(recipientId, supabase, {
+        `)))
+      }
+      if (configurePush()) {
+        tasks.push(sendPush(recipientId, supabase, {
           title: `${senderName} sent you a message`,
           body: safePreview ? safePreview.slice(0, 100) : 'Tap to reply.',
           url: `/chat/${msgBookingId}`,
-        }) : Promise.resolve(),
-      ])
+        }))
+      }
+      await Promise.all(tasks)
     }
 
     return NextResponse.json({ ok: true })

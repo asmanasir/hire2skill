@@ -11,6 +11,18 @@ export type Conversation = {
   lastMessageAt: string | null
   unreadCount: number
   status: string
+  proposalTitle: string | null
+}
+
+function stripJobRefPrefix(text: string | null | undefined): string | null {
+  if (!text) return null
+  return text.replace(/^\s*\[JOB:[^\]]+\]\s*/i, '').trim()
+}
+
+function extractJobRefId(text: string | null | undefined): string | null {
+  if (!text) return null
+  const m = text.match(/^\s*\[JOB:([0-9a-f-]{36})\]/i)
+  return m?.[1] ?? null
 }
 
 export default async function ChatPage() {
@@ -22,8 +34,8 @@ export default async function ChatPage() {
 
   try {
     const [{ data: asHelper }, { data: asPoster }] = await Promise.all([
-      supabase.from('bookings').select('id, poster_id, helper_id, status').eq('helper_id', user.id).in('status', ['accepted', 'pending', 'completed']),
-      supabase.from('bookings').select('id, poster_id, helper_id, status').eq('poster_id', user.id).in('status', ['accepted', 'pending', 'completed']),
+      supabase.from('bookings').select('id, poster_id, helper_id, status, post_id, message').eq('helper_id', user.id).in('status', ['accepted', 'pending', 'completed']),
+      supabase.from('bookings').select('id, poster_id, helper_id, status, post_id, message').eq('poster_id', user.id).in('status', ['accepted', 'pending', 'completed']),
     ])
 
     const allBookings = [
@@ -34,16 +46,21 @@ export default async function ChatPage() {
     if (allBookings.length > 0) {
       const otherIds = allBookings.map(b => b.isHelper ? b.poster_id : b.helper_id)
       const bookingIds = allBookings.map(b => b.id)
+      const jobIds = [...new Set(allBookings.map((b) => b.post_id ?? extractJobRefId(b.message)).filter(Boolean) as string[])]
 
-      const [{ data: profiles }, { data: msgs }] = await Promise.all([
+      const [{ data: profiles }, { data: msgs }, { data: posts }] = await Promise.all([
         supabase.from('profiles').select('id, display_name, avatar_url').in('id', otherIds),
         supabase.from('messages')
           .select('id, booking_id, sender_id, body, created_at, read_at')
           .in('booking_id', bookingIds)
           .order('created_at', { ascending: false }),
+        jobIds.length > 0
+          ? supabase.from('posts').select('id, title').in('id', jobIds)
+          : Promise.resolve({ data: [] as { id: string; title: string | null }[] }),
       ])
 
       const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
+      const postTitleById = Object.fromEntries((posts ?? []).map((p) => [p.id, p.title ?? 'Untitled job']))
 
       const msgsByBooking: Record<string, typeof msgs> = {}
       for (const m of msgs ?? []) {
@@ -56,15 +73,17 @@ export default async function ChatPage() {
         const profile = profileMap[otherId]
         const bMsgs = msgsByBooking[b.id] ?? []
         const last = bMsgs[0]
+        const proposalJobId = b.post_id ?? extractJobRefId(b.message)
         return {
           bookingId: b.id,
           otherId,
           otherName: profile?.display_name ?? null,
           otherAvatar: profile?.avatar_url ?? null,
-          lastMessage: last?.body ?? null,
+          lastMessage: stripJobRefPrefix(last?.body ?? null),
           lastMessageAt: last?.created_at ?? null,
           unreadCount: bMsgs.filter(m => m.sender_id !== user.id && !m.read_at).length,
           status: b.status,
+          proposalTitle: proposalJobId ? (postTitleById[proposalJobId] ?? 'Untitled job') : null,
         }
       })
 

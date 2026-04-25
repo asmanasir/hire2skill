@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/context/LanguageContext'
 import { logClientEvent } from '@/lib/telemetry'
-import { postNotify } from '@/lib/client-notify'
+import { explainNotifyFailure, postNotify } from '@/lib/client-notify'
 import { CATEGORY_BY_KEY, toCategoryKey } from '@/lib/categories'
 import { categoryIconProps } from '@/lib/category-icon'
 import ConfirmActionModal from '@/components/ConfirmActionModal'
@@ -277,7 +277,7 @@ export default function TaskerProfileContent({
         bookingData: { helper_id: tasker.id, poster_id: user.id },
       })
       if (!notify.ok) {
-        setNotifyWarn(d.notifyEmailWarn)
+        setNotifyWarn(`${d.notifyEmailWarn} (${explainNotifyFailure(notify)})`)
         logClientEvent('tasker.request.notify', 'warn', 'New booking notify request failed', {
           taskerId: tasker.id,
           reason: notify.reason,

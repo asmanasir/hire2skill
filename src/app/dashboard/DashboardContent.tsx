@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/context/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import { logClientEvent } from '@/lib/telemetry'
-import { postNotify } from '@/lib/client-notify'
+import { explainNotifyFailure, postNotify } from '@/lib/client-notify'
 import { formatDateByLocale } from '@/lib/i18n/date'
 import type { BookingItem, Post } from './page'
 
@@ -39,6 +39,7 @@ const POST_STATUS_META: Record<string, { bg: string; color: string }> = {
 
 type FilterOption = 'all' | 'pending' | 'accepted' | 'declined' | 'cancelled' | 'completed'
 const ALL_FILTERS: FilterOption[] = ['all', 'pending', 'accepted', 'declined', 'completed', 'cancelled']
+type BookingKind = 'request' | 'proposal'
 
 function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
   const R = 6371
@@ -58,6 +59,17 @@ function timeAgo(iso: string): string {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ago`
   return `${Math.floor(hrs / 24)}d ago`
+}
+
+function stripJobRefPrefix(text: string | null | undefined): string {
+  if (!text) return ''
+  return text.replace(/^\s*\[JOB:[^\]]+\]\s*/i, '').trim()
+}
+
+function bookingKind(booking: BookingItem): BookingKind {
+  if (booking.post_id) return 'proposal'
+  if (/^\s*\[JOB:[^\]]+\]/i.test(booking.message ?? '')) return 'proposal'
+  return 'request'
 }
 
 function Avatar({ name, avatarUrl, size = 10 }: { name: string | null; avatarUrl: string | null; size?: number }) {
@@ -393,6 +405,7 @@ function RescheduleModal({
 function BookingCard({
   booking,
   isHelper,
+  kind,
   onUpdate,
   onReview,
   onReschedule,
@@ -401,6 +414,7 @@ function BookingCard({
 }: {
   booking: BookingItem
   isHelper: boolean
+  kind: BookingKind
   onUpdate: (id: string, status: string) => void
   onReview: (booking: BookingItem) => void
   onReschedule: (booking: BookingItem) => void
@@ -426,13 +440,13 @@ function BookingCard({
     await supabase.from('bookings').update({ status }).eq('id', booking.id)
     setUpdating(false)
     onUpdate(booking.id, status)
-    if (status === 'accepted') {
+    if (status === 'accepted' || status === 'declined') {
       const notify = await postNotify({
-        type: 'booking-accepted',
+        type: status === 'accepted' ? 'booking-accepted' : 'booking-declined',
         bookingData: { id: booking.id, poster_id: booking.poster_id, helper_id: booking.helper_id },
       })
       if (!notify.ok) {
-        setNotifyWarn(d.notifyEmailWarn)
+        setNotifyWarn(`${d.notifyEmailWarn} (${explainNotifyFailure(notify)})`)
         logClientEvent('dashboard.notify', 'warn', 'Booking accepted notify request failed', {
           bookingId: booking.id,
           reason: notify.reason,
@@ -484,7 +498,7 @@ function BookingCard({
         </div>
       </div>
 
-      <p className="text-sm text-gray-600 line-clamp-2 italic">&ldquo;{booking.message}&rdquo;</p>
+      <p className="text-sm text-gray-600 line-clamp-2 italic">&ldquo;{stripJobRefPrefix(booking.message)}&rdquo;</p>
       {(booking.post_title || booking.post_category || booking.post_location) && (
         <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
           {booking.post_title && (
@@ -534,8 +548,8 @@ function BookingCard({
         </div>
       )}
 
-      {/* Pending: helper accepts/declines */}
-      {booking.status === 'pending' && isHelper && (
+      {/* Pending request for helper: accept/decline */}
+      {booking.status === 'pending' && isHelper && kind === 'request' && (
         <div className="grid grid-cols-3 gap-2 pt-1">
           <Link href={`/chat/${booking.id}`}
             className="rounded-xl py-2 text-sm font-bold border-2 border-blue-200 text-blue-700 text-center hover:bg-blue-50 transition-colors">
@@ -553,8 +567,8 @@ function BookingCard({
         </div>
       )}
 
-      {/* Pending: poster cancels */}
-      {booking.status === 'pending' && !isHelper && (
+      {/* Pending proposal sent by helper: waiting + optional cancel */}
+      {booking.status === 'pending' && isHelper && kind === 'proposal' && (
         <div className="grid grid-cols-2 gap-2 pt-1">
           <Link href={`/chat/${booking.id}`}
             className="rounded-xl py-2 text-sm font-bold border-2 border-blue-200 text-blue-700 text-center hover:bg-blue-50 transition-colors">
@@ -564,6 +578,30 @@ function BookingCard({
             className="rounded-xl py-2 text-sm font-bold border-2 border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-600 transition-colors disabled:opacity-50">
             {updating ? d.actionCancelling : d.actionCancelRequest}
           </button>
+        </div>
+      )}
+
+      {/* Pending request from poster: cancel */}
+      {booking.status === 'pending' && !isHelper && kind === 'request' && (
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <Link href={`/chat/${booking.id}`}
+            className="rounded-xl py-2 text-sm font-bold border-2 border-blue-200 text-blue-700 text-center hover:bg-blue-50 transition-colors">
+            {d.actionMessage}
+          </Link>
+          <button onClick={() => updateStatus('cancelled')} disabled={updating}
+            className="rounded-xl py-2 text-sm font-bold border-2 border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-600 transition-colors disabled:opacity-50">
+            {updating ? d.actionCancelling : d.actionCancelRequest}
+          </button>
+        </div>
+      )}
+
+      {/* Pending proposal received by poster: review in chat */}
+      {booking.status === 'pending' && !isHelper && kind === 'proposal' && (
+        <div className="pt-1">
+          <Link href={`/chat/${booking.id}`}
+            className="w-full block rounded-xl py-2 text-sm font-bold border-2 border-blue-200 text-blue-700 text-center hover:bg-blue-50 transition-colors">
+            {d.actionMessage}
+          </Link>
         </div>
       )}
 
@@ -653,18 +691,17 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks'>('overview')
   const [bookings, setBookings] = useState<BookingItem[]>(initialBookings)
   const [activeFilter, setActiveFilter] = useState<FilterOption>('all')
+  const [activeKind, setActiveKind] = useState<'all' | BookingKind>('all')
   const [reviewTarget, setReviewTarget] = useState<BookingItem | null>(null)
   const [rescheduleTarget, setRescheduleTarget] = useState<BookingItem | null>(null)
   const [userCoords, setUserCoords] = useState<{ lat: number; lon: number } | null>(null)
   const [distanceByLocation, setDistanceByLocation] = useState<Record<string, number>>({})
-
-  useEffect(() => {
-    setBookings(initialBookings)
-  }, [initialBookings])
+  const [incomingRequestToast, setIncomingRequestToast] = useState<string | null>(null)
 
   function handleTabChange(tab: 'overview' | 'tasks') {
     setActiveTab(tab)
     setActiveFilter('all')
+    setActiveKind('all')
   }
 
   function handleBookingUpdate(id: string, status: string) {
@@ -679,13 +716,20 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, scheduled_date: newDate } : b))
   }
 
-  const pendingCount = bookings.filter(b => b.status === 'pending').length
-  // For helpers: show pending badge (need to action). For posters: show accepted badge (helper said yes!).
-  const notifCount = isHelper ? pendingCount : bookings.filter(b => b.status === 'accepted').length
+  const requestCount = bookings.filter((b) => bookingKind(b) === 'request').length
+  const proposalCount = bookings.filter((b) => bookingKind(b) === 'proposal').length
+  // Helper badge should only show actionable incoming requests (not proposals sent by helper).
+  const notifCount = isHelper
+    ? bookings.filter((b) => bookingKind(b) === 'request' && b.status === 'pending').length
+    : bookings.filter(b => b.status === 'accepted').length
+
+  const byKind = activeKind === 'all'
+    ? bookings
+    : bookings.filter((b) => bookingKind(b) === activeKind)
 
   const filteredBookings = activeFilter === 'all'
-    ? bookings
-    : bookings.filter(b => b.status === activeFilter)
+    ? byKind
+    : byKind.filter(b => b.status === activeFilter)
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return
@@ -752,7 +796,23 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'bookings', filter },
-        () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (payload: any) => {
+          if (
+            role === 'helper' &&
+            payload?.eventType === 'INSERT' &&
+            payload?.new?.status === 'pending'
+          ) {
+            setIncomingRequestToast(d.requestReceivedRealtime ?? 'New request received.')
+          }
+          if (
+            role === 'poster' &&
+            payload?.eventType === 'UPDATE' &&
+            payload?.new?.status === 'declined' &&
+            payload?.old?.status !== 'declined'
+          ) {
+            setIncomingRequestToast(d.requestDeclinedRealtime ?? 'Your request was declined.')
+          }
           router.refresh()
         },
       )
@@ -760,7 +820,13 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [currentUserId, role, router])
+  }, [currentUserId, role, router, d.requestDeclinedRealtime, d.requestReceivedRealtime])
+
+  useEffect(() => {
+    if (!incomingRequestToast) return
+    const id = window.setTimeout(() => setIncomingRequestToast(null), 4500)
+    return () => window.clearTimeout(id)
+  }, [incomingRequestToast])
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8 w-full">
@@ -790,6 +856,12 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
         <div className="mb-6 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           {t.dashboard.requestSent}
+        </div>
+      )}
+      {incomingRequestToast && (
+        <div className="mb-6 rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 text-sm text-indigo-700 flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          {incomingRequestToast}
         </div>
       )}
 
@@ -872,6 +944,19 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
                   <p className="text-xs text-gray-400">{t.dashboard.profileSub}</p>
                 </div>
               </Link>
+              <Link href="/profile?tab=cancel" className="flex items-center gap-4 rounded-xl bg-white border border-red-200 p-5 hover:border-red-300 hover:bg-red-50 transition-colors">
+                <div className="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="8" y1="8" x2="16" y2="16"/>
+                    <line x1="16" y1="8" x2="8" y2="16"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-gray-900">{d.cancelTaskQuick}</p>
+                  <p className="text-xs text-red-500">{d.cancelTaskQuickSub}</p>
+                </div>
+              </Link>
               <Link href="/referral" className="flex items-center gap-4 rounded-xl bg-white border border-amber-200 p-5 hover:border-amber-400 hover:bg-amber-50 transition-colors">
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#FFFBEB' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
@@ -889,7 +974,10 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
                 {t.dashboard.recentPosts}
               </h2>
-              <Link href="/post" className="text-xs text-blue-600 hover:underline">{t.dashboard.newPost}</Link>
+              <div className="flex items-center gap-4">
+                <Link href="/profile?tab=cancel" className="text-xs text-red-600 hover:underline">{d.manageCancellations}</Link>
+                <Link href="/post" className="text-xs text-blue-600 hover:underline">{t.dashboard.newPost}</Link>
+              </div>
             </div>
             {recentPosts.length > 0 ? (
               <div className="flex flex-col gap-3">
@@ -930,6 +1018,24 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
             />
           ) : (
             <>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {[
+                  { key: 'all' as const, label: d.filterAll, count: bookings.length },
+                  { key: 'request' as const, label: d.requestsReceived, count: requestCount },
+                  { key: 'proposal' as const, label: d.proposalsSent, count: proposalCount },
+                ]
+                  .filter((x) => x.count > 0 || x.key === 'all')
+                  .map((x) => (
+                    <button key={x.key} onClick={() => setActiveKind(x.key)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        activeKind === x.key
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-600 hover:border-indigo-300'
+                      }`}>
+                      {x.label} <span className={activeKind === x.key ? 'opacity-75' : 'opacity-60'}>({x.count})</span>
+                    </button>
+                  ))}
+              </div>
               <FilterChips bookings={bookings} active={activeFilter} onChange={setActiveFilter} />
               {filteredBookings.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
@@ -942,6 +1048,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
                       key={b.id}
                       booking={b}
                       isHelper={true}
+                      kind={bookingKind(b)}
                       onUpdate={handleBookingUpdate}
                       onReview={setReviewTarget}
                       onReschedule={setRescheduleTarget}
@@ -1042,6 +1149,24 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
               />
             ) : (
               <>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {[
+                    { key: 'all' as const, label: d.filterAll, count: bookings.length },
+                    { key: 'request' as const, label: d.requestsSent, count: requestCount },
+                    { key: 'proposal' as const, label: d.proposalsReceived, count: proposalCount },
+                  ]
+                    .filter((x) => x.count > 0 || x.key === 'all')
+                    .map((x) => (
+                      <button key={x.key} onClick={() => setActiveKind(x.key)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          activeKind === x.key
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white border border-gray-200 text-gray-600 hover:border-indigo-300'
+                        }`}>
+                        {x.label} <span className={activeKind === x.key ? 'opacity-75' : 'opacity-60'}>({x.count})</span>
+                      </button>
+                    ))}
+                </div>
                 <FilterChips bookings={bookings} active={activeFilter} onChange={setActiveFilter} />
                 {filteredBookings.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
@@ -1054,6 +1179,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
                         key={b.id}
                         booking={b}
                         isHelper={false}
+                        kind={bookingKind(b)}
                         onUpdate={handleBookingUpdate}
                         onReview={setReviewTarget}
                         onReschedule={setRescheduleTarget}

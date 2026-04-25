@@ -2,7 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ProfileContent from './ProfileContent'
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -49,12 +53,16 @@ export default async function ProfilePage() {
     reviewer_avatar: profileMap[r.reviewer_id]?.avatar_url ?? null,
   }))
 
+  const { tab } = await searchParams
+  const tabFromUrl = typeof tab === 'string' ? tab : null
+
   return (
     <ProfileContent
       user={{ id: user.id, email: user.email ?? '', created_at: user.created_at }}
       profile={profile ?? null}
       posts={posts ?? []}
       reviews={reviews}
+      initialTab={tabFromUrl}
     />
   )
 }

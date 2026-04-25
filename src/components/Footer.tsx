@@ -21,7 +21,7 @@ export default function Footer() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{f.platform}</p>
             <ul className="flex flex-col gap-2">
-              <li><Link href="/signup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.findJobs}</Link></li>
+              <li><Link href="/jobs" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.findJobs}</Link></li>
               <li><Link href="/post" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.postJob}</Link></li>
               <li><Link href="/signup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.createAccount}</Link></li>
             </ul>

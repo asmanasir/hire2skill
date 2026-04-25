@@ -3,14 +3,25 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/context/LanguageContext'
+
+function resolveNextPath(raw: string | null): string | null {
+  if (!raw) return null
+  if (!raw.startsWith('/')) return null
+  if (raw.startsWith('//')) return null
+  return raw
+}
 
 export default function LoginPage() {
   const { t } = useLanguage()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const nextPath = resolveNextPath(searchParams.get('next'))
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -30,7 +41,7 @@ export default function LoginPage() {
         .eq('id', data.user.id)
         .maybeSingle()
 
-      window.location.href = profile ? '/dashboard' : '/onboarding'
+      window.location.href = profile ? (nextPath ?? '/dashboard') : '/onboarding'
     }
   }
 
@@ -87,7 +98,7 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-gray-500">
           {t.login.noAccount}{' '}
-          <Link href="/signup" className="font-semibold text-blue-600 hover:underline">
+          <Link href={nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : '/signup'} className="font-semibold text-blue-600 hover:underline">
             {t.login.signup}
           </Link>
         </p>

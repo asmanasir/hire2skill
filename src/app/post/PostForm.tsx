@@ -682,6 +682,8 @@ export default function PostForm() {
   const [category, setCategory] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [titleTouched, setTitleTouched] = useState(false)
+  const [descriptionTouched, setDescriptionTouched] = useState(false)
   const [location, setLocation] = useState('')
   const [budget, setBudget] = useState('')
   const [preferredDate, setPreferredDate] = useState('')
@@ -749,6 +751,17 @@ export default function PostForm() {
       !category || h.categories.some(c => c.toLowerCase() === category.toLowerCase())
     ),
   [allHelpers, category])
+
+  const scopingSummary = useMemo(() => {
+    return Object.entries(scopingAnswers)
+      .filter(([, v]) => v)
+      .map(([k, v]) => {
+        const q = localizedScopingQuestions[category]?.find(q => q.id === k)
+        return q ? `${q.label}: ${v}` : null
+      })
+      .filter(Boolean)
+      .join(' · ')
+  }, [category, localizedScopingQuestions, scopingAnswers])
 
   useEffect(() => {
     const raw = location.trim()
@@ -819,6 +832,17 @@ export default function PostForm() {
 
   function handleLocChange(val: string) {
     setLocation(val)
+    const loc = val.trim() || ui.locationFallbackCity
+    if (!titleTouched && category) {
+      setTitle(`${category} help needed in ${loc}`)
+    }
+    if (!descriptionTouched && category) {
+      setDescription(
+        scopingSummary
+          ? `${scopingSummary}\n\nPlease help with ${category.toLowerCase()} in ${loc}.`
+          : `Please help with ${category.toLowerCase()} in ${loc}.`,
+      )
+    }
     if (errors.location) setErrors(prev => ({ ...prev, location: '' }))
     if (!val.trim()) {
       setLocSuggestions([])
@@ -846,15 +870,6 @@ export default function PostForm() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login?next=/post'); return }
-
-    const scopingSummary = Object.entries(scopingAnswers)
-      .filter(([, v]) => v)
-      .map(([k, v]) => {
-        const q = localizedScopingQuestions[category]?.find(q => q.id === k)
-        return q ? `${q.label}: ${v}` : null
-      })
-      .filter(Boolean)
-      .join(' · ')
 
     const fullDescription = [scopingSummary, description.trim()].filter(Boolean).join('\n\n')
 
@@ -946,7 +961,16 @@ export default function PostForm() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {CATEGORIES.map(cat => (
               <button key={cat.key} type="button"
-                onClick={() => { setCategory(cat.key); setStep(2) }}
+                onClick={() => {
+                  const locDefault = ui.locationFallbackCity
+                  setCategory(cat.key)
+                  setScopingAnswers({})
+                  setTitle(`${cat.key} help needed in ${locDefault}`)
+                  setDescription(`Please help with ${cat.key.toLowerCase()} in ${locDefault}.`)
+                  setTitleTouched(false)
+                  setDescriptionTouched(false)
+                  setStep(2)
+                }}
                 className="flex flex-col items-center gap-3 rounded-2xl bg-white border-2 border-gray-100 px-3 py-5 hover:border-blue-400 hover:shadow-lg transition-all duration-200 text-center group">
                 <div className="h-14 w-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cat.bg }}>
                   <cat.Icon {...categoryIconProps(26, cat.color)} />
@@ -991,7 +1015,26 @@ export default function PostForm() {
                           const selected = scopingAnswers[q.id] === opt
                           return (
                             <button key={opt} type="button"
-                              onClick={() => setScopingAnswers(prev => ({ ...prev, [q.id]: selected ? '' : opt }))}
+                              onClick={() => {
+                                const nextAnswers = { ...scopingAnswers, [q.id]: selected ? '' : opt }
+                                setScopingAnswers(nextAnswers)
+                                if (!descriptionTouched) {
+                                  const loc = location.trim() || ui.locationFallbackCity
+                                  const nextSummary = Object.entries(nextAnswers)
+                                    .filter(([, v]) => v)
+                                    .map(([k, v]) => {
+                                      const item = localizedScopingQuestions[category]?.find((qq) => qq.id === k)
+                                      return item ? `${item.label}: ${v}` : null
+                                    })
+                                    .filter(Boolean)
+                                    .join(' · ')
+                                  setDescription(
+                                    nextSummary
+                                      ? `${nextSummary}\n\nPlease help with ${category.toLowerCase()} in ${loc}.`
+                                      : `Please help with ${category.toLowerCase()} in ${loc}.`,
+                                  )
+                                }
+                              }}
                               className="rounded-full px-3 py-1.5 text-xs font-semibold border transition-all"
                               style={selected
                                 ? { background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)', color: '#fff', borderColor: 'transparent' }
@@ -1010,7 +1053,7 @@ export default function PostForm() {
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">{ui.taskTitle} <span className="text-red-500">*</span></label>
                 <input type="text" value={title}
-                  onChange={e => { setTitle(e.target.value); if (errors.title) setErrors(p => ({ ...p, title: '' })) }}
+                  onChange={e => { setTitleTouched(true); setTitle(e.target.value); if (errors.title) setErrors(p => ({ ...p, title: '' })) }}
                   placeholder={`e.g. Need help with ${category.toLowerCase()} in ${location || ui.locationFallbackCity}`}
                   className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition ${errors.title ? 'border-red-400' : 'border-gray-200 focus:border-blue-400'}`} />
                 {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
@@ -1020,7 +1063,7 @@ export default function PostForm() {
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">{ui.taskDescription} <span className="text-red-500">*</span></label>
                 <textarea rows={4} value={description}
-                  onChange={e => { setDescription(e.target.value); if (errors.description) setErrors(p => ({ ...p, description: '' })) }}
+                  onChange={e => { setDescriptionTouched(true); setDescription(e.target.value); if (errors.description) setErrors(p => ({ ...p, description: '' })) }}
                   placeholder={ui.taskDescriptionPlaceholder}
                   className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 resize-none transition ${errors.description ? 'border-red-400' : 'border-gray-200 focus:border-blue-400'}`} />
                 {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description}</p>}

@@ -5,6 +5,8 @@ import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
 import LogoutButton from './LogoutButton'
 import RequestBell from './RequestBell'
+import ExploreMenu from './ExploreMenu'
+import MessagesNavLink from './MessagesNavLink'
 
 export default async function Navbar() {
   const supabase = await createClient()
@@ -19,7 +21,6 @@ export default async function Navbar() {
         .from('bookings')
         .select('id')
         .or(`helper_id.eq.${user.id},poster_id.eq.${user.id}`)
-        .in('status', ['pending', 'accepted', 'completed'])
 
       const bookingIds = (acceptedBookings ?? []).map(b => b.id)
 
@@ -47,23 +48,14 @@ export default async function Navbar() {
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-5">
-          <Link href="/services" className="hidden sm:block text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
-            Services
-          </Link>
-          <Link href="/taskers" className="hidden sm:block text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
-            Find Helpers
-          </Link>
+          <ExploreMenu />
 
           {user ? (
             <>
-              <Link href="/chat" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
-                Messages
-                {unreadCount > 0 && (
-                  <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[11px] font-bold text-white leading-none">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
+              <Link href="/dashboard" className="hidden sm:block text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
+                Dashboard
               </Link>
+              <MessagesNavLink userId={user.id} initialUnreadCount={unreadCount} />
               <Link href="/profile" className="hidden sm:block text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors">
                 Profile
               </Link>

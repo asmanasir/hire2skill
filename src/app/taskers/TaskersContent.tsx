@@ -67,7 +67,8 @@ function MapView({
     perHourShort: string
   }
 }) {
-  const [active, setActive] = useState<Tasker | null>(null)
+  const [activePinKey, setActivePinKey] = useState<string | null>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
 
   // Group taskers by city zone
   const pins = taskers.reduce<{ key: string; zone: { x: number; y: number; label: string }; items: Tasker[] }[]>((acc, t) => {
@@ -100,10 +101,18 @@ function MapView({
       {/* City pins */}
       {pins.map(pin => (
         <button key={pin.key} type="button"
-          onClick={() => setActive(active?.id === pin.items[0].id && pin.items.length === 1 ? null : pin.items[0])}
+          onClick={() => {
+            if (activePinKey === pin.key) {
+              setActivePinKey(null)
+              setActiveIndex(0)
+              return
+            }
+            setActivePinKey(pin.key)
+            setActiveIndex(0)
+          }}
           aria-label={ui.mapAriaShowHelpersInCity(pin.items.length, pin.zone.label)}
           className="absolute transform -translate-x-1/2 -translate-y-full group"
-          style={{ left: `${pin.zone.x}%`, top: `${pin.zone.y}%`, zIndex: active && pin.items.some(t => t.id === active.id) ? 20 : 10 }}>
+          style={{ left: `${pin.zone.x}%`, top: `${pin.zone.y}%`, zIndex: activePinKey === pin.key ? 20 : 10 }}>
           <div className="flex flex-col items-center">
             <div className="rounded-full text-white text-xs font-extrabold px-2.5 py-1 shadow-lg transition-transform group-hover:scale-110 flex items-center gap-1"
               style={{ background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)', minWidth: 28 }}>
@@ -117,25 +126,58 @@ function MapView({
       ))}
 
       {/* Popup */}
-      {active && (
+      {activePinKey && (
         <div className="absolute bottom-4 left-4 right-4 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 z-30">
           <div className="flex items-center gap-3">
+            {(() => {
+              const activePin = pins.find(p => p.key === activePinKey)
+              if (!activePin) return null
+              const current = activePin.items[activeIndex] ?? activePin.items[0]
+              if (!current) return null
+              return (
+                <>
             <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
-              style={{ background: AVATAR_COLORS[active.display_name.charCodeAt(0) % AVATAR_COLORS.length] }}>
-              {active.display_name.split(' ').map(w => w[0]?.toUpperCase()).join('').slice(0, 2)}
+              style={{ background: AVATAR_COLORS[current.display_name.charCodeAt(0) % AVATAR_COLORS.length] }}>
+              {current.display_name.split(' ').map(w => w[0]?.toUpperCase()).join('').slice(0, 2)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-sm truncate">{active.display_name}</p>
-              <p className="text-xs text-gray-400">{active.location} · {active.hourly_rate} {ui.perHourShort}</p>
+              <p className="font-bold text-gray-900 text-sm truncate">{current.display_name}</p>
+              <p className="text-xs text-gray-400">
+                {current.location} · {current.hourly_rate > 0 ? `${current.hourly_rate} ${ui.perHourShort}` : ui.perHourShort}
+              </p>
             </div>
             <div className="flex gap-2">
-              <Link href={`/taskers/${active.id}`}
+              <Link href={`/taskers/${current.id}`}
                 className="rounded-xl px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity"
                 style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
                 {bookLabel}
               </Link>
-              <button onClick={() => setActive(null)} aria-label={ui.mapClosePreview} className="text-gray-400 hover:text-gray-600 px-1">✕</button>
+              <button onClick={() => setActivePinKey(null)} aria-label={ui.mapClosePreview} className="text-gray-400 hover:text-gray-600 px-1">✕</button>
             </div>
+            {activePin.items.length > 1 && (
+              <div className="ml-2 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveIndex(i => (i - 1 + activePin.items.length) % activePin.items.length)}
+                  className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                >
+                  ‹
+                </button>
+                <span className="text-[11px] text-gray-400 px-1">
+                  {activeIndex + 1}/{activePin.items.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveIndex(i => (i + 1) % activePin.items.length)}
+                  className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                >
+                  ›
+                </button>
+              </div>
+            )}
+                </>
+              )
+            })()}
           </div>
         </div>
       )}

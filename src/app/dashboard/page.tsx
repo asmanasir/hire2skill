@@ -29,6 +29,18 @@ export type BookingItem = {
   has_review: boolean
 }
 
+type BookingRow = {
+  id: string
+  created_at: string
+  status: string
+  message: string | null
+  post_id: string | null
+  scheduled_date: string | null
+  budget: number | null
+  poster_id: string
+  helper_id: string
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -63,7 +75,7 @@ export default async function DashboardPage({
 
       if (raw && raw.length > 0) {
         // Always keep base bookings visible, even if enrichment queries fail.
-        bookings = raw.map((b: any) => ({
+        bookings = raw.map((b: BookingRow) => ({
           id: b.id,
           created_at: b.created_at,
           status: b.status,
@@ -118,7 +130,7 @@ export default async function DashboardPage({
 
       if (raw && raw.length > 0) {
         // Always keep base bookings visible, even if enrichment queries fail.
-        bookings = raw.map((b: any) => ({
+        bookings = raw.map((b: BookingRow) => ({
           id: b.id,
           created_at: b.created_at,
           status: b.status,

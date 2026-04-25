@@ -3,6 +3,62 @@
 
 BEGIN;
 
+-- Bookings schema support for dashboard + job proposals
+ALTER TABLE public.bookings
+  ADD COLUMN IF NOT EXISTS post_id uuid REFERENCES public.posts(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS message text,
+  ADD COLUMN IF NOT EXISTS budget integer,
+  ADD COLUMN IF NOT EXISTS scheduled_date date;
+
+ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "bookings_select_own" ON public.bookings;
+DROP POLICY IF EXISTS "bookings_insert_participant" ON public.bookings;
+DROP POLICY IF EXISTS "bookings_update_participant" ON public.bookings;
+
+CREATE POLICY "bookings_select_own"
+  ON public.bookings FOR SELECT
+  USING (auth.uid() = poster_id OR auth.uid() = helper_id);
+
+CREATE POLICY "bookings_insert_participant"
+  ON public.bookings FOR INSERT
+  WITH CHECK (auth.uid() = poster_id OR auth.uid() = helper_id);
+
+CREATE POLICY "bookings_update_participant"
+  ON public.bookings FOR UPDATE
+  USING (auth.uid() = poster_id OR auth.uid() = helper_id)
+  WITH CHECK (auth.uid() = poster_id OR auth.uid() = helper_id);
+
+-- Proposal totals per post for /jobs (not readable row-by-row under RLS for other helpers)
+DROP FUNCTION IF EXISTS public.count_proposals_per_post(uuid[]);
+CREATE OR REPLACE FUNCTION public.count_proposals_per_post(post_ids uuid[])
+RETURNS TABLE(post_id uuid, proposal_count bigint)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    p.u AS post_id,
+    COUNT(DISTINCT b.id)::bigint AS proposal_count
+  FROM unnest(post_ids) AS p(u)
+  INNER JOIN public.posts po ON po.id = p.u
+  LEFT JOIN public.bookings b
+    ON (
+      (b.post_id = p.u AND COALESCE(b.status, 'pending') <> 'cancelled')
+      OR (
+        b.post_id IS NULL
+        AND COALESCE(b.status, 'pending') <> 'cancelled'
+        AND b.poster_id = po.user_id
+        AND left(trim(b.message), length('[JOB:' || p.u::text || ']')) = '[JOB:' || p.u::text || ']'
+      )
+    )
+  GROUP BY p.u;
+$$;
+
+REVOKE ALL ON FUNCTION public.count_proposals_per_post(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.count_proposals_per_post(uuid[]) TO anon, authenticated;
+
 -- Core profile fields used by app
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS role text,
