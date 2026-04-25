@@ -80,6 +80,11 @@ function getTaskerProfileUi(locale: 'no' | 'en' | 'da' | 'sv') {
       sendRequestTo: (name: string) => `Send request to ${name}`,
       needHelpWith: 'What do you need help with?',
       requestTemplatesTitle: 'Quick templates',
+      trustSignalsTitle: 'Trust signals',
+      trustVerifiedId: 'Verified ID',
+      trustFastResponse: 'Fast response',
+      trustTopRated: 'Top rated',
+      trustCompletedJobs: (count: number) => `${count} completed jobs`,
       describeTaskFor: (name: string) => `Describe your task for ${name}...`,
       when: 'When?',
       budgetNok: 'Budget (NOK)',
@@ -122,6 +127,11 @@ function getTaskerProfileUi(locale: 'no' | 'en' | 'da' | 'sv') {
     sendRequestTo: (name: string) => `Send foresporsel til ${name}`,
     needHelpWith: 'Hva trenger du hjelp med?',
     requestTemplatesTitle: 'Hurtigmaler',
+    trustSignalsTitle: 'Trygghetssignaler',
+    trustVerifiedId: 'Verifisert ID',
+    trustFastResponse: 'Rask respons',
+    trustTopRated: 'Topprangert',
+    trustCompletedJobs: (count: number) => `${count} fullforte oppdrag`,
     describeTaskFor: (name: string) => `Beskriv oppdraget ditt for ${name}...`,
     when: 'Nar?',
     budgetNok: 'Budsjett (NOK)',
@@ -560,6 +570,30 @@ export default function TaskerProfileContent({
               </div>
               <div className="rounded-xl px-4 py-3 text-sm" style={{ background: avail.bg, color: avail.color }}>
                 {ui.typicallyRepliesWithin(tasker.response_hours)}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-blue-100 p-6">
+              <h3 className="text-sm font-extrabold text-blue-900 mb-3">{ui.trustSignalsTitle}</h3>
+              <div className="flex flex-wrap gap-2">
+                {tasker.verified && (
+                  <span className="rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-700">
+                    {ui.trustVerifiedId}
+                  </span>
+                )}
+                {tasker.response_hours <= 2 && (
+                  <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    {ui.trustFastResponse}
+                  </span>
+                )}
+                {tasker.rating >= 4.8 && (
+                  <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    {ui.trustTopRated}
+                  </span>
+                )}
+                <span className="rounded-full bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                  {ui.trustCompletedJobs(tasker.tasks_done)}
+                </span>
               </div>
             </div>
 

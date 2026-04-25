@@ -4,9 +4,10 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useLanguage } from '@/context/LanguageContext'
-import { Search, X } from 'lucide-react'
+import { CheckCircle2, Clock3, CreditCard, MapPin, MessageCircle, Search, ShieldCheck, Users, X, Zap } from 'lucide-react'
 import { CATEGORY_BY_KEY, CATEGORY_KEYS, CATEGORY_LABEL_BY_KEY, toCategoryKey } from '@/lib/categories'
 import { categoryIconProps } from '@/lib/category-icon'
+import IconBadge from '@/components/IconBadge'
 
 import type { RealHelper } from './page'
 
@@ -354,12 +355,14 @@ export default function HomeContent({
         <div className="mx-auto max-w-5xl">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12 text-white">
             {[
-              { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>, title: 'Hire2Skill Guarantee', desc: 'Not happy? We make it right.' },
-              { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>, title: 'Secure Payments', desc: 'Pay safely through Hire2Skill.' },
-              { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>, title: 'Verified Helpers', desc: 'ID-checked locals you can trust.' },
+              { icon: <ShieldCheck size={20} strokeWidth={2.3} />, title: 'Hire2Skill Guarantee', desc: 'Not happy? We make it right.' },
+              { icon: <CreditCard size={20} strokeWidth={2.3} />, title: 'Secure Payments', desc: 'Pay safely through Hire2Skill.' },
+              { icon: <CheckCircle2 size={20} strokeWidth={2.3} />, title: 'Verified Helpers', desc: 'ID-checked locals you can trust.' },
             ].map(item => (
               <div key={item.title} className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">{item.icon}</div>
+                <IconBadge tone="frost" size="md" withBorder={false}>
+                  {item.icon}
+                </IconBadge>
                 <div>
                   <p className="font-extrabold text-sm leading-tight">{item.title}</p>
                   <p className="text-xs text-white/80">{item.desc}</p>
@@ -449,9 +452,9 @@ export default function HomeContent({
               return (
                 <Link key={key} href={`/taskers?category=${encodeURIComponent(label)}`}
                   className="group flex flex-col items-center gap-2.5 rounded-2xl bg-white border border-gray-200 px-3 py-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 text-center">
-                  <div className="h-12 w-12 rounded-xl flex items-center justify-center shadow-sm" style={{ background: cfg.bg }}>
+                  <IconBadge size="lg" className="shadow-sm" style={{ background: cfg.bg }} withBorder={false}>
                     <CatIcon {...categoryIconProps(24, cfg.color)} />
-                  </div>
+                  </IconBadge>
                   <span className="text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors leading-tight">
                     {label}
                   </span>
@@ -532,9 +535,9 @@ export default function HomeContent({
       <section className="px-6 pb-14 max-w-6xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#FFF7ED,#FED7AA)' }}>
+            <IconBadge tone="orange" size="sm" withBorder={false}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            </div>
+            </IconBadge>
             <div>
               <h2 className="text-lg font-extrabold text-gray-900">{h.urgentTitle}</h2>
               <p className="text-sm text-gray-400">{h.urgentSub}</p>
@@ -555,15 +558,15 @@ export default function HomeContent({
           <p className="text-center text-xs font-extrabold uppercase tracking-widest text-gray-400 mb-10">{h.trustTitle}</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
             {[
-              { val: '2,400+', label: 'Verified users', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, bg: '#EFF6FF' },
-              { val: '< 2h', label: 'Avg. response', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>, bg: '#F5F3FF' },
-              { val: '8,000+', label: 'Tasks completed', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>, bg: '#F0FDF4' },
-              { val: '12', label: 'Cities covered', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>, bg: '#FFF7ED' },
+              { val: '2,400+', label: 'Verified users', icon: <Users size={22} strokeWidth={2.2} color="#2563EB" />, tone: 'blue' as const },
+              { val: '< 2h', label: 'Avg. response', icon: <Clock3 size={22} strokeWidth={2.2} color="#7C3AED" />, tone: 'violet' as const },
+              { val: '8,000+', label: 'Tasks completed', icon: <CheckCircle2 size={22} strokeWidth={2.2} color="#16A34A" />, tone: 'green' as const },
+              { val: '12', label: 'Cities covered', icon: <MapPin size={22} strokeWidth={2.2} color="#EA580C" />, tone: 'orange' as const },
             ].map(s => (
               <div key={s.label} className="flex flex-col items-center text-center">
-                <div className="h-12 w-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
+                <IconBadge tone={s.tone} size="lg" className="mb-3" withBorder={false}>
                   {s.icon}
-                </div>
+                </IconBadge>
                 <p className="text-2xl font-extrabold text-gray-900">{s.val}</p>
                 <p className="text-xs text-gray-500 mt-1">{s.label}</p>
               </div>
@@ -577,17 +580,17 @@ export default function HomeContent({
         <p className="text-center text-xs font-extrabold uppercase tracking-widest text-gray-400 mb-12">{h.whyTitle}</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
           {[
-            { bg: '#EFF6FF', title: h.fast.title, desc: h.fast.desc,
-              icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> },
-            { bg: '#F0FDF4', title: h.local.title, desc: h.local.desc,
-              icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> },
-            { bg: '#FFFBEB', title: h.chat.title, desc: h.chat.desc,
-              icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
+            { tone: 'blue' as const, title: h.fast.title, desc: h.fast.desc,
+              icon: <Zap size={28} strokeWidth={2.2} color="#2563EB" /> },
+            { tone: 'green' as const, title: h.local.title, desc: h.local.desc,
+              icon: <MapPin size={28} strokeWidth={2.2} color="#16A34A" /> },
+            { tone: 'amber' as const, title: h.chat.title, desc: h.chat.desc,
+              icon: <MessageCircle size={28} strokeWidth={2.2} color="#D97706" /> },
           ].map(f => (
             <div key={f.title} className="flex flex-col items-center text-center">
-              <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-5 shadow-sm" style={{ background: f.bg }}>
+              <IconBadge tone={f.tone} size="xl" className="mb-5 shadow-sm" withBorder={false}>
                 {f.icon}
-              </div>
+              </IconBadge>
               <h3 className="text-base font-extrabold text-gray-900 mb-2">{f.title}</h3>
               <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
             </div>

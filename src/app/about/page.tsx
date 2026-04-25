@@ -1,4 +1,7 @@
 import Link from 'next/link'
+import { Bolt, Globe2, Handshake, ShieldCheck } from 'lucide-react'
+import IconBadge from '@/components/IconBadge'
+import type { IconBadgeTone } from '@/components/IconBadge'
 
 export const metadata = {
   title: 'About Hire2Skill',
@@ -12,24 +15,38 @@ const STATS = [
   { value: '4.8 ★', label: 'Average rating' },
 ]
 
-const VALUES = [
+const VALUES: Array<{
+  Icon: typeof ShieldCheck
+  iconColor: string
+  tone: IconBadgeTone
+  title: string
+  desc: string
+}> = [
   {
-    emoji: '🔒',
+    Icon: ShieldCheck,
+    iconColor: '#1D4ED8',
+    tone: 'blue',
     title: 'Trust first',
     desc: 'Every helper is ID-verified before they can accept bookings. Ratings and reviews are real — posted only by people who completed a task.',
   },
   {
-    emoji: '⚡',
+    Icon: Bolt,
+    iconColor: '#D97706',
+    tone: 'amber',
     title: 'Fast and easy',
     desc: 'Post a task in under two minutes. Get matched with available helpers the same day. No endless back-and-forth.',
   },
   {
-    emoji: '🤝',
+    Icon: Handshake,
+    iconColor: '#059669',
+    tone: 'emerald',
     title: 'Fair for everyone',
     desc: 'Helpers keep the majority of what they earn. Posters pay transparent prices with no hidden fees.',
   },
   {
-    emoji: '🌍',
+    Icon: Globe2,
+    iconColor: '#0891B2',
+    tone: 'cyan',
     title: 'Local, always',
     desc: 'We only operate in Norway. Our helpers live in your city and understand your community.',
   },
@@ -94,7 +111,9 @@ export default function AboutPage() {
           <div className="grid sm:grid-cols-2 gap-6">
             {VALUES.map(v => (
               <div key={v.title} className="bg-white rounded-2xl border border-gray-200 p-6">
-                <div className="text-3xl mb-3">{v.emoji}</div>
+                <IconBadge tone={v.tone} size="md" className="mb-3">
+                  <v.Icon size={22} strokeWidth={2.2} color={v.iconColor} />
+                </IconBadge>
                 <h3 className="font-bold text-gray-900 text-lg mb-2">{v.title}</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{v.desc}</p>
               </div>

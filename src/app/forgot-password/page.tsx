@@ -1,23 +1,59 @@
 'use client'
 
 import { useState } from 'react'
+import HCaptcha from '@hcaptcha/react-hcaptcha'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { getEmailGuardReason, normalizeEmail } from '@/lib/email-guard'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
+  const [captchaToken, setCaptchaToken] = useState('')
+  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim() ?? ''
+  const captchaEnabled = hcaptchaSiteKey.length > 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
+    const normalizedEmail = normalizeEmail(email)
+    const emailGuardReason = getEmailGuardReason(normalizedEmail)
+    if (emailGuardReason === 'invalid_format') {
+      setError('Please enter a valid email address.')
+      setLoading(false)
+      return
+    }
+    if (emailGuardReason === 'blocked_domain') {
+      setError('Please use a real email inbox. Test/disposable domains are blocked.')
+      setLoading(false)
+      return
+    }
+    const eligibilityRes = await fetch('/api/auth/email-eligibility', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail }),
+    })
+    if (eligibilityRes.ok) {
+      const eligibility = (await eligibilityRes.json()) as { blocked?: boolean }
+      if (eligibility.blocked) {
+        setError('This email is temporarily blocked due to previous delivery failures. Please contact support.')
+        setLoading(false)
+        return
+      }
+    }
+    if (captchaEnabled && !captchaToken) {
+      setError('Please complete captcha verification.')
+      setLoading(false)
+      return
+    }
 
     const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+      captchaToken: captchaEnabled ? captchaToken : undefined,
     })
 
     setLoading(false)
@@ -79,6 +115,11 @@ export default function ForgotPasswordPage() {
                 Enter your email and we&apos;ll send you a link to reset it.
               </p>
             </div>
+            {!captchaEnabled && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                hCaptcha is not configured. Set `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` to enable bot protection.
+              </div>
+            )}
 
             {error && (
               <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 border border-red-100">
@@ -107,6 +148,16 @@ export default function ForgotPasswordPage() {
               >
                 {loading ? 'Sending...' : 'Send reset link'}
               </button>
+              {captchaEnabled && (
+                <div className="pt-1">
+                  <HCaptcha
+                    sitekey={hcaptchaSiteKey}
+                    onVerify={token => setCaptchaToken(token)}
+                    onExpire={() => setCaptchaToken('')}
+                    onError={() => setError('Captcha verification failed. Please try again.')}
+                  />
+                </div>
+              )}
             </form>
 
             <p className="mt-6 text-center text-sm text-gray-500">

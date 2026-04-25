@@ -32,7 +32,7 @@ export default function ExploreMenu() {
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full mt-2 w-44 rounded-xl border p-1 z-50 shadow-lg"
+          className="absolute left-0 top-full mt-2 w-52 rounded-xl border p-1 z-50 shadow-lg"
           style={{
             background: 'var(--sl-bg-card)',
             borderColor: 'var(--sl-border)',
@@ -53,4 +53,3 @@ export default function ExploreMenu() {
     </div>
   )
 }
-

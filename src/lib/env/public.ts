@@ -8,6 +8,7 @@ export const PUBLIC_ENV = {
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: clean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY),
   NEXT_PUBLIC_SITE_URL:         clean(process.env.NEXT_PUBLIC_SITE_URL),
   NEXT_PUBLIC_APP_URL:          clean(process.env.NEXT_PUBLIC_APP_URL),
+  NEXT_PUBLIC_HCAPTCHA_SITE_KEY: clean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY),
 }
 
 function requireValue(name: string, value: string | undefined): string {

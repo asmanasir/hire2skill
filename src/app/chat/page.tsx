@@ -34,8 +34,8 @@ export default async function ChatPage() {
 
   try {
     const [{ data: asHelper }, { data: asPoster }] = await Promise.all([
-      supabase.from('bookings').select('id, poster_id, helper_id, status, post_id, message').eq('helper_id', user.id).in('status', ['accepted', 'pending', 'completed']),
-      supabase.from('bookings').select('id, poster_id, helper_id, status, post_id, message').eq('poster_id', user.id).in('status', ['accepted', 'pending', 'completed']),
+      supabase.from('bookings').select('id, poster_id, helper_id, status, post_id, message').eq('helper_id', user.id).in('status', ['accepted', 'pending', 'completed', 'declined', 'cancelled']),
+      supabase.from('bookings').select('id, poster_id, helper_id, status, post_id, message').eq('poster_id', user.id).in('status', ['accepted', 'pending', 'completed', 'declined', 'cancelled']),
     ])
 
     const allBookings = [

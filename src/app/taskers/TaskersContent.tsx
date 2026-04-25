@@ -8,6 +8,7 @@ import { useLanguage } from '@/context/LanguageContext'
 import { Search, X, LayoutGrid, Map } from 'lucide-react'
 import { CATEGORY_BY_KEY, CATEGORY_LABEL_BY_KEY, CATEGORY_LABELS, toCategoryKey } from '@/lib/categories'
 import { categoryIconProps } from '@/lib/category-icon'
+import { helperCityKey } from '@/lib/helper-city-key'
 
 type Tasker = {
   id: string
@@ -49,10 +50,6 @@ const CITY_ZONES: Record<string, { x: number; y: number; label: string }> = {
   'ålesund':      { x: 24, y: 32, label: 'Ålesund' },
 }
 
-function cityKey(location: string) {
-  return location.toLowerCase().split(/[–\s]/)[0].trim()
-}
-
 function MapView({
   taskers,
   bookLabel,
@@ -72,7 +69,7 @@ function MapView({
 
   // Group taskers by city zone
   const pins = taskers.reduce<{ key: string; zone: { x: number; y: number; label: string }; items: Tasker[] }[]>((acc, t) => {
-    const key = cityKey(t.location)
+    const key = helperCityKey(t.location)
     const zone = CITY_ZONES[key] ?? CITY_ZONES['oslo']
     const existing = acc.find(p => p.key === key)
     if (existing) { existing.items.push(t); return acc }
@@ -224,24 +221,19 @@ function TaskerCard({
     tasksCount: (count: number) => string
     responseWithinHours: (hours: number) => string
     viewProfile: string
+    trustSignalsTitle: string
+    trustVerifiedId: string
+    trustFastResponse: string
+    trustTopRated: string
+    trustCompletedJobs: (count: number) => string
   }
 }) {
   const initials = tasker.display_name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
   const color = AVATAR_COLORS[index % AVATAR_COLORS.length]
-  const availableToday = tasker.response_hours <= 2
   const instantBook = tasker.verified && tasker.rating >= 4.8
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-5 hover:border-blue-300 hover:shadow-lg transition-all duration-200 flex flex-col relative overflow-hidden">
-      {/* Availability ribbon */}
-      {availableToday && (
-        <div className="absolute top-0 right-0">
-          <div className="bg-green-500 text-white text-[10px] font-extrabold px-3 py-1 rounded-bl-xl rounded-tr-2xl tracking-wide">
-            {ui.availableToday}
-          </div>
-        </div>
-      )}
-
       <div className="flex items-start gap-3.5 mb-3.5">
         {tasker.avatar_url ? (
           <Image src={tasker.avatar_url} alt={tasker.display_name} width={64} height={64} className="h-16 w-16 rounded-2xl object-cover shrink-0" />
@@ -251,7 +243,7 @@ function TaskerCard({
             {initials}
           </div>
         )}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-extrabold text-gray-900 text-[15px] leading-tight">{tasker.display_name}</h3>
             {isElite(tasker) && (
@@ -284,7 +276,7 @@ function TaskerCard({
             )}
           </div>
         </div>
-        <div className="text-right shrink-0 pl-2">
+        <div className="text-right shrink-0 pl-2 min-w-[86px] pt-5">
           <p className="text-2xl font-extrabold text-gray-900 leading-none">{tasker.hourly_rate} NOK</p>
           <p className="text-xs text-gray-400">{ui.perHour}</p>
         </div>
@@ -316,6 +308,30 @@ function TaskerCard({
         </div>
       </div>
 
+      <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2">
+        <p className="text-[11px] font-bold text-blue-900 mb-1">{ui.trustSignalsTitle}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {tasker.verified && (
+            <span className="rounded-full bg-white border border-green-200 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+              {ui.trustVerifiedId}
+            </span>
+          )}
+          {tasker.response_hours <= 2 && (
+            <span className="rounded-full bg-white border border-blue-200 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              {ui.trustFastResponse}
+            </span>
+          )}
+          {tasker.rating >= 4.8 && (
+            <span className="rounded-full bg-white border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              {ui.trustTopRated}
+            </span>
+          )}
+          <span className="rounded-full bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+            {ui.trustCompletedJobs(tasker.tasks_done)}
+          </span>
+        </div>
+      </div>
+
       <div className="flex gap-2.5 mt-auto pt-3.5 border-t border-gray-100">
         <Link href={`/taskers/${tasker.id}`}
           className="flex-1 rounded-xl py-2.5 text-sm font-bold text-blue-600 border border-blue-200 text-center hover:bg-blue-50 transition-all">
@@ -331,7 +347,15 @@ function TaskerCard({
   )
 }
 
-export default function TaskersContent({ taskers, activeCategory }: { taskers: Tasker[]; activeCategory: string | null }) {
+export default function TaskersContent({
+  taskers,
+  activeCategory,
+  citySlug,
+}: {
+  taskers: Tasker[]
+  activeCategory: string | null
+  citySlug: string | null
+}) {
   const { t } = useLanguage()
   const tt = t.taskers
   const ui = {
@@ -376,7 +400,21 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
     mapClosePreview: tt.mapClosePreview ?? 'Close map preview',
     mapHelpersAcrossNorway: (count: number) =>
       tt.mapHelpersAcrossNorway?.(count) ?? `${count} helper${count === 1 ? '' : 's'} across Norway`,
+    trustSignalsTitle: tt.trustSignalsTitle ?? 'Trust signals',
+    trustVerifiedId: tt.trustVerifiedId ?? 'Verified ID',
+    trustFastResponse: tt.trustFastResponse ?? 'Fast response',
+    trustTopRated: tt.trustTopRated ?? 'Top rated',
+    trustCompletedJobs: (count: number) => tt.trustCompletedJobs?.(count) ?? `${count} completed jobs`,
   }
+
+  const cityKeyNorm = citySlug?.toLowerCase() ?? ''
+  const cityBlock =
+    cityKeyNorm === 'oslo' || cityKeyNorm === 'bergen' || cityKeyNorm === 'trondheim'
+      ? tt.cityLanding?.[cityKeyNorm as 'oslo' | 'bergen' | 'trondheim']
+      : undefined
+  const pageTitle = cityBlock?.title ?? ui.title
+  const pageSubtitle = cityBlock?.subtitle ?? ui.subtitle
+
   const searchParams = useSearchParams()
   const posted = searchParams.get('posted') === '1'
 
@@ -429,6 +467,11 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
 
   const filtered = useMemo(() => {
     let list = [...taskers]
+
+    if (citySlug) {
+      const key = citySlug.toLowerCase()
+      list = list.filter(t => helperCityKey(t.location) === key)
+    }
 
     const norwegianSignals = /(norsk|bokmål|bokmaal|nynorsk|snakker norsk|taler norsk|på norsk|norwegian|fluent norwegian)/i
     const englishSignals = /(english|engelsk|fluent english|business english|comfortable in english|native english)/i
@@ -515,8 +558,15 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
       {/* Header + Search */}
       <div className="bg-white border-b border-gray-200 px-6 py-8">
         <div className="mx-auto max-w-6xl">
-          <h1 className="text-[30px] leading-tight font-extrabold text-gray-900 mb-2">{ui.title}</h1>
-          <p className="text-gray-500 text-[15px]">{ui.subtitle}</p>
+          <h1 className="text-[30px] leading-tight font-extrabold text-gray-900 mb-2">{pageTitle}</h1>
+          <p className="text-gray-500 text-[15px]">{pageSubtitle}</p>
+          {citySlug && tt.cityLanding?.browseAllNorway && (
+            <p className="mt-2">
+              <Link href="/taskers" className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                {tt.cityLanding.browseAllNorway}
+              </Link>
+            </p>
+          )}
           <p className="text-xs text-gray-400 mt-3 max-w-2xl leading-relaxed">{tt.trustLine}</p>
 
           {/* Search bar */}
@@ -551,7 +601,82 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
       </div>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-6">
+          <aside className="lg:sticky lg:top-24 self-start rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
+            <p className="text-sm font-bold text-gray-800">Filters</p>
 
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">City</label>
+              <select
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              >
+                {locations.map(l => <option key={l} value={l}>{l === 'All' ? ui.anyLocation : l}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Price (NOK)</label>
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm">
+              <span className="text-gray-400 text-xs font-medium">NOK</span>
+              <input type="number" placeholder="Min" value={priceMin} onChange={e => setPriceMin(e.target.value)} className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0" />
+              <span className="text-gray-300 text-xs">–</span>
+              <input type="number" placeholder="Max" value={priceMax} onChange={e => setPriceMax(e.target.value)} className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0" />
+            </div>
+            </div>
+
+            <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Rating</label>
+            <select value={minRating} onChange={e => setMinRating(Number(e.target.value))}
+              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
+              <option value={0}>{ui.anyRating}</option>
+              <option value={3}>★ 3+</option>
+              <option value={4}>★ 4+</option>
+              <option value={4.5}>★ 4.5+</option>
+            </select>
+            </div>
+
+            <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Availability</label>
+            <select value={maxResponseHours} onChange={e => setMaxResponseHours(Number(e.target.value))}
+              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
+              <option value={24}>{ui.anyAvailability}</option>
+              <option value={1}>{ui.availableNow}</option>
+              <option value={2}>{ui.respondsQuickly}</option>
+              <option value={4}>{ui.withinFourHours}</option>
+            </select>
+            </div>
+
+            <div className="flex flex-col gap-2 mb-4">
+              <button type="button" onClick={() => setWantNorwegian(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
+                style={wantNorwegian ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
+                {tt.filterLangNo}
+              </button>
+              <button type="button" onClick={() => setWantEnglish(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
+                style={wantEnglish ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
+                {tt.filterLangEn}
+              </button>
+              <button type="button" onClick={() => setWantTools(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
+                style={wantTools ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
+                {tt.filterTools}
+              </button>
+              <button type="button" onClick={() => setWantInvoice(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
+                style={wantInvoice ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
+                {tt.filterInvoice}
+              </button>
+            </div>
+
+            {hasActiveFilters && (
+              <button onClick={clearAll}
+                className="w-full flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
+                <X size={13} />
+                {ui.clear}
+              </button>
+            )}
+          </aside>
+
+          <div>
         {/* Category chips */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
           {CATEGORIES.map(cat => (
@@ -563,107 +688,6 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
               {cat}
             </button>
           ))}
-        </div>
-
-        {/* Filter strip */}
-        <div className="flex flex-wrap items-center gap-2.5 mb-5 rounded-2xl border border-gray-200 bg-white p-3">
-
-          {/* Price range */}
-          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm">
-            <span className="text-gray-400 text-xs font-medium">NOK</span>
-            <input
-              type="number" placeholder="Min" value={priceMin}
-              onChange={e => setPriceMin(e.target.value)}
-              className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0"
-            />
-            <span className="text-gray-300 text-xs">–</span>
-            <input
-              type="number" placeholder="Max" value={priceMax}
-              onChange={e => setPriceMax(e.target.value)}
-              className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0"
-            />
-          </div>
-
-          {/* Location */}
-          <select value={location} onChange={e => setLocation(e.target.value)}
-            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
-            {locations.map(l => <option key={l} value={l}>{l === 'All' ? ui.anyLocation : l}</option>)}
-          </select>
-
-          {/* Min rating */}
-          <select value={minRating} onChange={e => setMinRating(Number(e.target.value))}
-            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
-            <option value={0}>{ui.anyRating}</option>
-            <option value={3}>★ 3+</option>
-            <option value={4}>★ 4+</option>
-            <option value={4.5}>★ 4.5+</option>
-          </select>
-
-          {/* Availability */}
-          <select value={maxResponseHours} onChange={e => setMaxResponseHours(Number(e.target.value))}
-            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
-            <option value={24}>{ui.anyAvailability}</option>
-            <option value={1}>{ui.availableNow}</option>
-            <option value={2}>{ui.respondsQuickly}</option>
-            <option value={4}>{ui.withinFourHours}</option>
-          </select>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setWantNorwegian(v => !v)}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors"
-              style={wantNorwegian
-                ? { background: 'var(--sl-gradient-brand)', color: '#fff', borderColor: 'transparent' }
-                : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-              {tt.filterLangNo}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWantEnglish(v => !v)}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors"
-              style={wantEnglish
-                ? { background: 'var(--sl-gradient-brand)', color: '#fff', borderColor: 'transparent' }
-                : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-              {tt.filterLangEn}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWantTools(v => !v)}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors"
-              style={wantTools
-                ? { background: 'var(--sl-gradient-brand)', color: '#fff', borderColor: 'transparent' }
-                : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-              {tt.filterTools}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWantInvoice(v => !v)}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors"
-              style={wantInvoice
-                ? { background: 'var(--sl-gradient-brand)', color: '#fff', borderColor: 'transparent' }
-                : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-              {tt.filterInvoice}
-            </button>
-          </div>
-
-          {/* Clear all */}
-          {hasActiveFilters && (
-            <button onClick={clearAll}
-              className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
-              <X size={13} />
-              {ui.clear}
-            </button>
-          )}
-
-          {/* Sort — pushed to the right */}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-gray-400 hidden sm:inline">{ui.sortLabel}</span>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
-              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
-              {SORT_OPTIONS.map(option => <option key={option} value={option}>{tt.sortOptions?.[option] ?? option}</option>)}
-            </select>
-          </div>
         </div>
 
         {/* Results count + seasonal tag + view toggle */}
@@ -739,6 +763,8 @@ export default function TaskersContent({ taskers, activeCategory }: { taskers: T
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
             {ui.ctaButton}
           </Link>
+        </div>
+          </div>
         </div>
       </div>
     </div>

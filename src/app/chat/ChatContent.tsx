@@ -78,6 +78,12 @@ export default function ChatContent({ conversations }: { conversations: Conversa
                     {conv.status === 'completed' && (
                       <span className="rounded-full bg-gray-100 border border-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-500">{c.statusDone}</span>
                     )}
+                    {conv.status === 'declined' && (
+                      <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold text-red-700">{c.statusDeclined}</span>
+                    )}
+                    {conv.status === 'cancelled' && (
+                      <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">{c.statusCancelled}</span>
+                    )}
                     {conv.lastMessageAt && (
                       <span className="text-xs text-gray-400">{timeAgo(conv.lastMessageAt)}</span>
                     )}

@@ -24,6 +24,14 @@ export default function Footer() {
               <li><Link href="/jobs" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.findJobs}</Link></li>
               <li><Link href="/post" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.postJob}</Link></li>
               <li><Link href="/signup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.createAccount}</Link></li>
+              <li className="pt-2 mt-1 border-t border-gray-100">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">{f.citiesHeading}</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  <Link href="/cities/oslo" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">Oslo</Link>
+                  <Link href="/cities/bergen" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">Bergen</Link>
+                  <Link href="/cities/trondheim" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">Trondheim</Link>
+                </div>
+              </li>
             </ul>
           </div>
           <div>

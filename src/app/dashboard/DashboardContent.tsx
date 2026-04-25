@@ -438,6 +438,20 @@ function BookingCard({
     setUpdating(true)
     const supabase = createClient()
     await supabase.from('bookings').update({ status }).eq('id', booking.id)
+    if (status === 'accepted' && booking.post_id) {
+      // Mark competing pending proposals as declined so helpers see the task is fulfilled.
+      await supabase
+        .from('bookings')
+        .update({ status: 'declined' })
+        .eq('post_id', booking.post_id)
+        .eq('status', 'pending')
+        .neq('id', booking.id)
+      await supabase
+        .from('posts')
+        .update({ status: 'closed' })
+        .eq('id', booking.post_id)
+        .eq('user_id', booking.poster_id)
+    }
     setUpdating(false)
     onUpdate(booking.id, status)
     if (status === 'accepted' || status === 'declined') {
@@ -689,6 +703,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
   const isHelper = role === 'helper'
 
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks'>('overview')
+  const [posts, setPosts] = useState<Post[]>(recentPosts)
   const [bookings, setBookings] = useState<BookingItem[]>(initialBookings)
   const [activeFilter, setActiveFilter] = useState<FilterOption>('all')
   const [activeKind, setActiveKind] = useState<'all' | BookingKind>('all')
@@ -697,6 +712,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
   const [userCoords, setUserCoords] = useState<{ lat: number; lon: number } | null>(null)
   const [distanceByLocation, setDistanceByLocation] = useState<Record<string, number>>({})
   const [incomingRequestToast, setIncomingRequestToast] = useState<string | null>(null)
+  const [cancelPostBusyId, setCancelPostBusyId] = useState<string | null>(null)
 
   function handleTabChange(tab: 'overview' | 'tasks') {
     setActiveTab(tab)
@@ -714,6 +730,31 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
 
   function handleRescheduleDone(bookingId: string, newDate: string) {
     setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, scheduled_date: newDate } : b))
+  }
+
+  async function cancelPostedTask(postId: string) {
+    if (cancelPostBusyId) return
+    const ok = window.confirm(d.cancelTaskConfirm ?? 'Cancel this task? It will no longer accept new requests.')
+    if (!ok) return
+    setCancelPostBusyId(postId)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('posts')
+      .update({ status: 'cancelled' })
+      .eq('id', postId)
+      .eq('user_id', currentUserId)
+    setCancelPostBusyId(null)
+    if (error) {
+      setIncomingRequestToast(d.cancelTaskFailed ?? 'Could not cancel task. Please try again.')
+      logClientEvent('dashboard.post.cancel', 'warn', 'Cancel posted task failed', { postId, error: error.message })
+      return
+    }
+    await supabase
+      .from('bookings')
+      .update({ status: 'cancelled' })
+      .eq('post_id', postId)
+      .in('status', ['pending', 'accepted'])
+    setPosts((prev) => prev.filter((p) => p.id !== postId))
   }
 
   const requestCount = bookings.filter((b) => bookingKind(b) === 'request').length
@@ -806,6 +847,30 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
             setIncomingRequestToast(d.requestReceivedRealtime ?? 'New request received.')
           }
           if (
+            role === 'helper' &&
+            payload?.eventType === 'UPDATE' &&
+            payload?.old?.status !== 'accepted' &&
+            payload?.new?.status === 'accepted'
+          ) {
+            setIncomingRequestToast('Your proposal was accepted.')
+          }
+          if (
+            role === 'helper' &&
+            payload?.eventType === 'UPDATE' &&
+            payload?.old?.status === 'pending' &&
+            payload?.new?.status === 'declined'
+          ) {
+            setIncomingRequestToast(d.requestDeclinedRealtime ?? 'Your proposal was declined.')
+          }
+          if (
+            role === 'helper' &&
+            payload?.eventType === 'UPDATE' &&
+            payload?.old?.status !== 'cancelled' &&
+            payload?.new?.status === 'cancelled'
+          ) {
+            setIncomingRequestToast('This job was cancelled by the poster.')
+          }
+          if (
             role === 'poster' &&
             payload?.eventType === 'UPDATE' &&
             payload?.new?.status === 'declined' &&
@@ -896,11 +961,15 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
       {/* ── OVERVIEW ── */}
       {activeTab === 'overview' && (
         <>
+          {(() => {
+            const requestsLabel = isHelper ? d.requestsReceived : d.requestsSent
+            const proposalsLabel = isHelper ? d.proposalsSent : d.proposalsReceived
+            return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {[
               { label: t.dashboard.stats.posts, value: postCount },
-              { label: isHelper ? t.dashboard.requestsReceived : t.dashboard.requestsSent, value: bookings.length },
-              { label: t.dashboard.stats.messages, value: 0 },
+              { label: requestsLabel, value: requestCount },
+              { label: proposalsLabel, value: proposalCount },
               { label: t.dashboard.stats.views, value: 0 },
             ].map(stat => (
               <div key={stat.label} className="rounded-xl bg-white border border-gray-200 p-5">
@@ -909,6 +978,8 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
               </div>
             ))}
           </div>
+            )
+          })()}
 
           <div className="mb-8">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">
@@ -979,17 +1050,29 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
                 <Link href="/post" className="text-xs text-blue-600 hover:underline">{t.dashboard.newPost}</Link>
               </div>
             </div>
-            {recentPosts.length > 0 ? (
+            {posts.length > 0 ? (
               <div className="flex flex-col gap-3">
-                {recentPosts.slice(0, 5).map(post => (
+                {posts.slice(0, 5).map(post => (
                   <div key={post.id} className="flex items-center justify-between rounded-xl bg-white border border-gray-200 px-5 py-4">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{post.title}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{post.location} · {post.category}</p>
                     </div>
-                    <span className="text-xs text-gray-400">
-                      {formatDateByLocale(post.created_at, locale, { day: 'numeric', month: 'short' })}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400">
+                        {formatDateByLocale(post.created_at, locale, { day: 'numeric', month: 'short' })}
+                      </span>
+                      {post.status === 'open' && (
+                        <button
+                          type="button"
+                          onClick={() => void cancelPostedTask(post.id)}
+                          disabled={cancelPostBusyId === post.id}
+                          className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                        >
+                          {cancelPostBusyId === post.id ? (d.actionCancelling ?? 'Cancelling…') : d.actionCancelTask}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1071,16 +1154,16 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-                {t.dashboard.postedTasksCount(recentPosts.length)}
+                {t.dashboard.postedTasksCount(posts.length)}
               </h2>
               <Link href="/post" className="text-xs font-semibold text-blue-600 hover:underline">
                 {t.dashboard.newTask}
               </Link>
             </div>
 
-            {recentPosts.length > 0 ? (
+            {posts.length > 0 ? (
               <div className="flex flex-col gap-3">
-                {recentPosts.map(post => {
+                {posts.map(post => {
                   const pm = POST_STATUS_META[post.status] ?? POST_STATUS_META.open
                   const postStatusLabel =
                     post.status === 'open' ? d.statusOpen :
@@ -1107,6 +1190,16 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
                           style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
                           {d.findHelper}
                         </Link>
+                        {post.status === 'open' && (
+                          <button
+                            type="button"
+                            onClick={() => void cancelPostedTask(post.id)}
+                            disabled={cancelPostBusyId === post.id}
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 whitespace-nowrap hover:bg-red-50 disabled:opacity-50"
+                          >
+                            {cancelPostBusyId === post.id ? (d.actionCancelling ?? 'Cancelling…') : d.actionCancelTask}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )

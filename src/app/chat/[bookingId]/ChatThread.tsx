@@ -99,6 +99,8 @@ export default function ChatThread({
     if (bookingStatus === 'pending' && isHelper) return c.yourProposalPending
     if (bookingStatus === 'accepted') return c.bookingAccepted
     if (bookingStatus === 'declined') return c.bookingStatusDeclined
+    if (bookingStatus === 'cancelled') return c.statusCancelled
+    if (bookingStatus === 'completed') return c.statusDone
     return c.bookingStatusOther
   }, [bookingStatus, c, isHelper, isPoster])
 
@@ -107,6 +109,8 @@ export default function ChatThread({
     if (bookingStatus === 'pending' && isHelper) return 'text-amber-600'
     if (bookingStatus === 'accepted') return 'text-green-600'
     if (bookingStatus === 'declined') return 'text-red-600'
+    if (bookingStatus === 'cancelled') return 'text-slate-600'
+    if (bookingStatus === 'completed') return 'text-blue-600'
     return 'text-gray-500'
   }, [bookingStatus, isHelper, isPoster])
 
@@ -172,6 +176,19 @@ export default function ChatThread({
       return
     }
     setBookingStatus(status)
+    if (status === 'accepted' && initialBooking.post_id) {
+      await supabase
+        .from('bookings')
+        .update({ status: 'declined' })
+        .eq('post_id', initialBooking.post_id)
+        .eq('status', 'pending')
+        .neq('id', bookingId)
+      await supabase
+        .from('posts')
+        .update({ status: 'closed' })
+        .eq('id', initialBooking.post_id)
+        .eq('user_id', initialBooking.poster_id)
+    }
     const notify = await postNotify({
       type: status === 'accepted' ? 'booking-accepted' : 'booking-declined',
       bookingData: { id: bookingId, poster_id: initialBooking.poster_id, helper_id: initialBooking.helper_id },

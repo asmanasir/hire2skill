@@ -45,6 +45,14 @@ type Post = {
   created_at: string
 }
 
+type PostBookingState = {
+  pending: number
+  accepted: number
+  declined: number
+  cancelled: number
+  completed: number
+}
+
 type Review = {
   id: string
   rating: number
@@ -69,19 +77,21 @@ function sameStringArray(a: string[] | null | undefined, b: string[] | null | un
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TABS = [
-  { key: 'profile',       label: 'Profile' },
-  { key: 'verification',  label: 'Verification' },
-  { key: 'password',      label: 'Password' },
-  { key: 'security',      label: 'Account Security' },
-  { key: 'notifications', label: 'Notifications' },
-  { key: 'billing',       label: 'Billing Info' },
-  { key: 'cancel',        label: 'Cancel a Task' },
-  { key: 'business',      label: 'Business Information' },
-  { key: 'balance',       label: 'Account Balance' },
-  { key: 'transactions',  label: 'Transactions' },
-  { key: 'delete',        label: 'Delete Account' },
-]
+function getProfileTabs(t: ReturnType<typeof useLanguage>['t']) {
+  return [
+    { key: 'profile',       label: t.profilePage.tabProfile },
+    { key: 'verification',  label: t.profilePage.tabVerification },
+    { key: 'password',      label: t.profilePage.tabPassword },
+    { key: 'security',      label: t.profilePage.tabSecurity },
+    { key: 'notifications', label: t.profilePage.tabNotifications },
+    { key: 'billing',       label: t.profilePage.tabBilling },
+    { key: 'cancel',        label: t.profilePage.tabCancelTask },
+    { key: 'business',      label: t.profilePage.tabBusiness },
+    { key: 'balance',       label: t.profilePage.tabBalance },
+    { key: 'transactions',  label: t.profilePage.tabTransactions },
+    { key: 'delete',        label: t.profilePage.tabDelete },
+  ]
+}
 
 const SERVICE_CATEGORIES = [
   'Cleaning','Moving','Tutoring','Delivery','Handyman','Events',
@@ -560,11 +570,12 @@ export default function ProfileContent({
   reviews: Review[]
   initialTab?: string | null
 }) {
-  const { locale } = useLanguage()
+  const { locale, t } = useLanguage()
+  const tabs = useMemo(() => getProfileTabs(t), [t])
   const saveUi = useMemo(() => getProfileSaveUi(locale), [locale])
   const router = useRouter()
   const initialTabKey =
-    initialTab && TABS.some((t) => t.key === initialTab) ? initialTab : 'profile'
+    initialTab && tabs.some((tabItem) => tabItem.key === initialTab) ? initialTab : 'profile'
   const [tab, setTab] = useState(initialTabKey)
 
   // ── Profile tab state
@@ -619,6 +630,8 @@ export default function ProfileContent({
   const [posts,         setPosts]         = useState<Post[]>(initPosts)
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   const [cancelBusy,    setCancelBusy]    = useState<string | null>(null)
+  const [postBookingState, setPostBookingState] = useState<Record<string, PostBookingState>>({})
+  const [loadingPostBookingState, setLoadingPostBookingState] = useState(false)
 
   // ── Delete account modal
   const [showDelete,   setShowDelete]   = useState(false)
@@ -659,6 +672,36 @@ export default function ProfileContent({
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'cancel' || posts.length === 0) return
+    let active = true
+    async function loadPostStates() {
+      setLoadingPostBookingState(true)
+      const sb = createClient()
+      const postIds = posts.map((p) => p.id)
+      const { data } = await sb
+        .from('bookings')
+        .select('post_id, status')
+        .in('post_id', postIds)
+      if (!active) return
+
+      const next: Record<string, PostBookingState> = {}
+      for (const id of postIds) {
+        next[id] = { pending: 0, accepted: 0, declined: 0, cancelled: 0, completed: 0 }
+      }
+      for (const row of data ?? []) {
+        const pid = row.post_id as string | null
+        const status = row.status as keyof PostBookingState | null
+        if (!pid || !status || !next[pid] || next[pid][status] == null) continue
+        next[pid][status] += 1
+      }
+      setPostBookingState(next)
+      setLoadingPostBookingState(false)
+    }
+    void loadPostStates()
+    return () => { active = false }
+  }, [posts, tab])
 
   function handleLocationChange(val: string) {
     setLocation(val)
@@ -755,8 +798,22 @@ export default function ProfileContent({
 
   async function cancelPost(id: string) {
     setCancelBusy(id)
-    await createClient().from('posts').update({ status: 'cancelled' }).eq('id', id)
-    setPosts(p => p.filter(x => x.id !== id))
+    const sb = createClient()
+    await sb.from('posts').update({ status: 'cancelled' }).eq('id', id)
+    await sb
+      .from('bookings')
+      .update({ status: 'cancelled' })
+      .eq('post_id', id)
+      .in('status', ['pending', 'accepted'])
+    setPosts(p => p.map(x => x.id === id ? { ...x, status: 'cancelled' } : x))
+    setPostBookingState((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] ?? { pending: 0, accepted: 0, declined: 0, cancelled: 0, completed: 0 }),
+        pending: 0,
+        accepted: 0,
+      },
+    }))
     setCancelBusy(null); setConfirmCancel(null)
   }
 
@@ -784,29 +841,29 @@ export default function ProfileContent({
   return (
     <div className="min-h-screen bg-gray-50 py-10">
       <div className="mx-auto max-w-5xl px-6">
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-8">Your Account</h1>
+        <h1 className="text-3xl font-extrabold text-gray-900 mb-8">{t.profilePage.title}</h1>
 
         <div className="flex gap-8 items-start">
 
           {/* ── Sidebar ── */}
           <aside className="w-52 shrink-0">
             <nav className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              {TABS.map((t, i) => (
-                <button key={t.key} onClick={() => setTab(t.key)}
+              {tabs.map((tabItem, i) => (
+                <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
                   className={`relative block w-full text-left px-4 py-3 text-sm font-medium transition-all
-                    ${i < TABS.length - 1 ? 'border-b border-gray-100' : ''}
-                    ${t.key === 'delete'
-                      ? tab === t.key
+                    ${i < tabs.length - 1 ? 'border-b border-gray-100' : ''}
+                    ${tabItem.key === 'delete'
+                      ? tab === tabItem.key
                         ? 'text-red-600 font-bold bg-red-50'
                         : 'text-red-500 hover:bg-red-50'
-                      : tab === t.key
+                      : tab === tabItem.key
                         ? 'text-blue-600 font-bold bg-blue-50'
                         : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
                     }`}>
-                  {tab === t.key && (
-                    <span className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-r ${t.key === 'delete' ? 'bg-red-500' : 'bg-blue-600'}`} />
+                  {tab === tabItem.key && (
+                    <span className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-r ${tabItem.key === 'delete' ? 'bg-red-500' : 'bg-blue-600'}`} />
                   )}
-                  {t.label}
+                  {tabItem.label}
                 </button>
               ))}
             </nav>
@@ -1253,7 +1310,7 @@ export default function ProfileContent({
             {/* ─── CANCEL A TASK ─── */}
             {tab === 'cancel' && (
               <div>
-                <SectionTitle title="Cancel a Task" sub="View and cancel your open task requests." />
+                <SectionTitle title={t.profilePage.cancelTitle} sub={t.profilePage.cancelSub} />
 
                 {posts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
@@ -1262,8 +1319,8 @@ export default function ProfileContent({
                         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
                       </svg>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900">No active tasks</p>
-                    <p className="text-xs text-gray-400 mt-1">Your open task posts will appear here.</p>
+                    <p className="text-sm font-semibold text-gray-900">{t.profilePage.noActiveTasks}</p>
+                    <p className="text-xs text-gray-400 mt-1">{t.profilePage.noActiveTasksSub}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1278,26 +1335,51 @@ export default function ProfileContent({
                               {formatDateByLocale(post.created_at, locale, { day: 'numeric', month: 'short' })}
                             </span>
                           </div>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {(() => {
+                              const st = postBookingState[post.id] ?? { pending: 0, accepted: 0, declined: 0, cancelled: 0, completed: 0 }
+                              const total = st.pending + st.accepted + st.declined + st.cancelled + st.completed
+                              if (loadingPostBookingState && total === 0) {
+                                return (
+                                  <span className="text-[11px] text-gray-400">Loading status…</span>
+                                )
+                              }
+                              return (
+                                <>
+                                  {st.pending > 0 && <span className="text-[11px] font-semibold rounded-full bg-amber-50 text-amber-700 px-2 py-0.5">{t.profilePage.waitingCount(st.pending)}</span>}
+                                  {st.accepted > 0 && <span className="text-[11px] font-semibold rounded-full bg-blue-50 text-blue-700 px-2 py-0.5">{t.profilePage.acceptedCount(st.accepted)}</span>}
+                                  {st.completed > 0 && <span className="text-[11px] font-semibold rounded-full bg-green-50 text-green-700 px-2 py-0.5">{t.profilePage.fulfilledCount(st.completed)}</span>}
+                                  {st.declined > 0 && <span className="text-[11px] font-semibold rounded-full bg-rose-50 text-rose-700 px-2 py-0.5">{t.profilePage.declinedCount(st.declined)}</span>}
+                                  {st.cancelled > 0 && <span className="text-[11px] font-semibold rounded-full bg-slate-100 text-slate-700 px-2 py-0.5">{t.profilePage.cancelledCount(st.cancelled)}</span>}
+                                  {total === 0 && <span className="text-[11px] text-gray-400">{t.profilePage.noRequestsYet}</span>}
+                                </>
+                              )
+                            })()}
+                          </div>
                         </div>
                         <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
-                          post.status === 'open' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-                        }`}>{post.status}</span>
+                          post.status === 'open'
+                            ? 'bg-green-50 text-green-700'
+                            : post.status === 'cancelled'
+                              ? 'bg-slate-100 text-slate-700'
+                              : 'bg-yellow-50 text-yellow-700'
+                        }`}>{post.status === 'open' ? t.dashboard.statusOpen : post.status === 'cancelled' ? t.dashboard.statusCancelled : t.dashboard.statusClosed}</span>
 
                         {confirmCancel === post.id ? (
                           <div className="flex items-center gap-2 shrink-0">
                             <button onClick={() => setConfirmCancel(null)}
                               className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
-                              Keep
+                              {t.profilePage.keep}
                             </button>
                             <button onClick={() => cancelPost(post.id)} disabled={cancelBusy === post.id}
                               className="text-xs px-3 py-1.5 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition-colors disabled:opacity-60">
-                              {cancelBusy === post.id ? '…' : 'Yes, cancel'}
+                              {cancelBusy === post.id ? '…' : t.profilePage.yesCancel}
                             </button>
                           </div>
                         ) : (
                           <button onClick={() => setConfirmCancel(post.id)}
                             className="shrink-0 text-xs font-semibold text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                            Cancel task
+                            {t.profilePage.cancelTaskAction}
                           </button>
                         )}
                       </div>

@@ -50,6 +50,7 @@ import type { ServiceDef } from '@/lib/services'
 import { getRelatedServices } from '@/lib/services'
 import { useLanguage } from '@/context/LanguageContext'
 import { categoryIconProps } from '@/lib/category-icon'
+import IconBadge from '@/components/IconBadge'
 
 type Helper = {
   id: string
@@ -209,6 +210,19 @@ const SERVICE_ICON_BY_SLUG: Record<string, ElementType> = {
   'driving-lessons': SteeringWheel,
   baking: CookingPot,
   'wait-in-line': PersonSimpleRun,
+}
+
+function ServiceIcon({
+  slug,
+  color = BRAND_MID,
+  size = 26,
+}: {
+  slug: string
+  color?: string
+  size?: number
+}) {
+  const Icon = SERVICE_ICON_BY_SLUG[slug] ?? Wrench
+  return <Icon {...categoryIconProps(size, color)} />
 }
 
 function getServicesUi(locale: 'no' | 'en' | 'da' | 'sv') {
@@ -376,7 +390,9 @@ export default function ServicePageContent({
       <div className="text-white" style={{ background: BRAND_GRADIENT }}>
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-4xl">{svc.emoji}</span>
+            <IconBadge tone="frost" size="lg" withBorder={false}>
+              <ServiceIcon slug={svc.slug} color="#FFFFFF" />
+            </IconBadge>
             <nav className="text-sm opacity-75">
               <Link href="/services" className="hover:underline">{ui.services}</Link>
               <span className="mx-2">/</span>
@@ -496,7 +512,9 @@ export default function ServicePageContent({
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
-              <p className="text-4xl mb-3">{svc.emoji}</p>
+              <IconBadge tone="blue" size="xl" className="mx-auto mb-3" withBorder={false}>
+                <ServiceIcon slug={svc.slug} color={BRAND_MID} size={32} />
+              </IconBadge>
               <p className="font-bold text-gray-700 mb-1">{ui.noHelpers}</p>
               <p className="text-sm text-gray-400 mb-6">{ui.noHelpersHint}</p>
               <Link href="/post"
@@ -524,17 +542,13 @@ export default function ServicePageContent({
               {related.map(r => (
                 <Link key={r.slug} href={`/services/${r.slug}`}
                   className="group bg-white border border-gray-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-lg transition-all duration-200 flex items-center gap-4">
-                  {(() => {
-                    const Icon = SERVICE_ICON_BY_SLUG[r.slug]
-                    return (
-                      <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: r.accentBg ?? BRAND_BG }}>
-                        {Icon
-                          ? <Icon {...categoryIconProps(22, r.accentColor ?? BRAND_MID)} />
-                          : <span className="text-2xl">{r.emoji}</span>}
-                      </div>
-                    )
-                  })()}
+                  <IconBadge
+                    size="lg"
+                    withBorder={false}
+                    style={{ background: r.accentBg ?? BRAND_BG }}
+                  >
+                    <ServiceIcon slug={r.slug} color={r.accentColor ?? BRAND_MID} size={22} />
+                  </IconBadge>
                   <div>
                     <p className="font-bold text-gray-900 text-sm group-hover:text-blue-600 transition-colors">{r.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{ui.fromPrice(r.priceMin)}</p>
