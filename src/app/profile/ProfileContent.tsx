@@ -890,7 +890,7 @@ export default function ProfileContent({
                           <div className="flex items-start justify-between gap-4 mb-2">
                             <div className="flex items-center gap-3">
                               {rev.reviewer_avatar ? (
-                                <Image src={rev.reviewer_avatar} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover shrink-0" />
+                                <Image src={rev.reviewer_avatar} alt={`${rev.reviewer_name ?? 'Anonymous'} avatar`} width={36} height={36} className="h-9 w-9 rounded-full object-cover shrink-0" />
                               ) : (
                                 <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                                   style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>

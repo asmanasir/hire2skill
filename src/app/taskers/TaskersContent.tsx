@@ -85,6 +85,7 @@ function MapView({ taskers, bookLabel }: { taskers: Tasker[]; bookLabel: string 
       {pins.map(pin => (
         <button key={pin.key} type="button"
           onClick={() => setActive(active?.id === pin.items[0].id && pin.items.length === 1 ? null : pin.items[0])}
+          aria-label={`Show ${pin.items.length} helper${pin.items.length === 1 ? '' : 's'} in ${pin.zone.label}`}
           className="absolute transform -translate-x-1/2 -translate-y-full group"
           style={{ left: `${pin.zone.x}%`, top: `${pin.zone.y}%`, zIndex: active && pin.items.some(t => t.id === active.id) ? 20 : 10 }}>
           <div className="flex flex-col items-center">
@@ -117,7 +118,7 @@ function MapView({ taskers, bookLabel }: { taskers: Tasker[]; bookLabel: string 
                 style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
                 {bookLabel}
               </Link>
-              <button onClick={() => setActive(null)} className="text-gray-400 hover:text-gray-600 px-1">✕</button>
+              <button onClick={() => setActive(null)} aria-label="Close map preview" className="text-gray-400 hover:text-gray-600 px-1">✕</button>
             </div>
           </div>
         </div>

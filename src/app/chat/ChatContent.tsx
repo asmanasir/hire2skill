@@ -16,10 +16,11 @@ function timeAgo(iso: string): string {
 
 function Avatar({ name, avatarUrl }: { name: string | null; avatarUrl: string | null }) {
   const initials = (name ?? '?').split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
+  const safeName = name?.trim() || 'User'
   const colors = ['#2563EB', '#16A34A', '#7C3AED', '#D97706', '#E11D48', '#0284C7']
   const bg = colors[(name ?? '').charCodeAt(0) % colors.length]
   if (avatarUrl) {
-    return <Image src={avatarUrl} alt="" width={48} height={48} className="h-12 w-12 rounded-full object-cover shrink-0" />
+    return <Image src={avatarUrl} alt={`${safeName} avatar`} width={48} height={48} className="h-12 w-12 rounded-full object-cover shrink-0" />
   }
   return (
     <div className="h-12 w-12 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"

@@ -8,11 +8,12 @@ import type { ChatMessage } from './page'
 
 function Avatar({ name, avatarUrl, size = 8 }: { name: string | null; avatarUrl: string | null; size?: number }) {
   const initials = (name ?? '?').split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
+  const safeName = name?.trim() || 'User'
   const colors = ['#2563EB', '#16A34A', '#7C3AED', '#D97706', '#E11D48', '#0284C7']
   const bg = colors[(name ?? '').charCodeAt(0) % colors.length]
   const cls = `h-${size} w-${size} rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0`
   const px = size * 4
-  if (avatarUrl) return <Image src={avatarUrl} alt="" width={px} height={px} className={`${cls} object-cover`} />
+  if (avatarUrl) return <Image src={avatarUrl} alt={`${safeName} avatar`} width={px} height={px} className={`${cls} object-cover`} />
   return <div className={cls} style={{ background: bg }}>{initials}</div>
 }
 
@@ -153,7 +154,7 @@ export default function ChatThread({
     <div className="flex flex-col" style={{ height: 'calc(100dvh - 69px)' }}>
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-gray-200 bg-white px-6 py-4 shrink-0">
-        <Link href="/chat" className="text-gray-400 hover:text-gray-600 transition-colors mr-1">
+        <Link href="/chat" aria-label="Back to conversations" className="text-gray-400 hover:text-gray-600 transition-colors mr-1">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
@@ -237,6 +238,7 @@ export default function ChatThread({
         />
         <button
           type="submit"
+          aria-label="Send message"
           disabled={!body.trim() || sending}
           className="h-11 w-11 rounded-2xl flex items-center justify-center text-white shrink-0 disabled:opacity-40 hover:opacity-90 transition-opacity"
           style={{ background: 'linear-gradient(135deg,#2563EB,#38BDF8)' }}
