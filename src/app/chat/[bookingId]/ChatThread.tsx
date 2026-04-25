@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import Image from 'next/image'
 import type { ChatMessage } from './page'
 
 function Avatar({ name, avatarUrl, size = 8 }: { name: string | null; avatarUrl: string | null; size?: number }) {
@@ -10,7 +11,8 @@ function Avatar({ name, avatarUrl, size = 8 }: { name: string | null; avatarUrl:
   const colors = ['#2563EB', '#16A34A', '#7C3AED', '#D97706', '#E11D48', '#0284C7']
   const bg = colors[(name ?? '').charCodeAt(0) % colors.length]
   const cls = `h-${size} w-${size} rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0`
-  if (avatarUrl) return <img src={avatarUrl} alt="" className={`${cls} object-cover`} />
+  const px = size * 4
+  if (avatarUrl) return <Image src={avatarUrl} alt="" width={px} height={px} className={`${cls} object-cover`} />
   return <div className={cls} style={{ background: bg }}>{initials}</div>
 }
 

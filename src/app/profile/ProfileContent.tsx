@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -709,7 +710,7 @@ export default function ProfileContent({
                 <div className="flex items-center gap-5 mb-8">
                   <div className="relative">
                     {avatar
-                      ? <img src={avatar} alt="avatar" className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-md" />
+                      ? <Image src={avatar} alt="avatar" width={80} height={80} className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-md" />
                       : (
                         <div className="h-20 w-20 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-md"
                           style={{ background: avatarColor }}>
@@ -889,7 +890,7 @@ export default function ProfileContent({
                           <div className="flex items-start justify-between gap-4 mb-2">
                             <div className="flex items-center gap-3">
                               {rev.reviewer_avatar ? (
-                                <img src={rev.reviewer_avatar} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                                <Image src={rev.reviewer_avatar} alt="" width={36} height={36} className="h-9 w-9 rounded-full object-cover shrink-0" />
                               ) : (
                                 <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                                   style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 
 type Submission = {
   id: string
@@ -166,7 +167,7 @@ export default function AdminVerificationsContent({ submissions: init }: { submi
             {docUrl.endsWith('.pdf') ? (
               <iframe src={docUrl} className="w-full h-[500px]" />
             ) : (
-              <img src={docUrl} alt="ID document" className="w-full object-contain max-h-[500px]" />
+              <Image src={docUrl} alt="ID document" width={1200} height={900} className="w-full object-contain max-h-[500px]" />
             )}
           </div>
         </div>

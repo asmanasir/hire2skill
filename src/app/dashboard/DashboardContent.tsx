@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import React, { useState } from 'react'
 import { useLanguage } from '@/context/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -49,7 +50,8 @@ function Avatar({ name, avatarUrl, size = 10 }: { name: string | null; avatarUrl
   const colors = ['#2563EB', '#16A34A', '#7C3AED', '#D97706', '#E11D48', '#0284C7']
   const bg = colors[(name ?? '').charCodeAt(0) % colors.length]
   const cls = `h-${size} w-${size} rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0`
-  if (avatarUrl) return <img src={avatarUrl} alt={name ?? ''} className={`${cls} object-cover`} />
+  const px = size * 4
+  if (avatarUrl) return <Image src={avatarUrl} alt={name ?? ''} width={px} height={px} className={`${cls} object-cover`} />
   return <div className={cls} style={{ background: bg }}>{initials}</div>
 }
 
@@ -250,8 +252,7 @@ function PhotoUploadButton({ bookingId }: { bookingId: string }) {
         <div className="flex gap-2 flex-wrap mb-2">
           {photos.map((p, i) => (
             <div key={i} className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt={p.label} className="h-16 w-16 rounded-xl object-cover border border-gray-200" />
+              <Image src={p.url} alt={p.label} width={64} height={64} className="h-16 w-16 rounded-xl object-cover border border-gray-200" />
               <span className="absolute bottom-0.5 left-0.5 rounded text-[9px] font-bold px-1 py-0.5 capitalize"
                 style={{ background: p.label === 'before' ? '#FFF7ED' : '#F0FDF4', color: p.label === 'before' ? '#EA580C' : '#16A34A' }}>
                 {p.label}

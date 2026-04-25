@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { CATEGORY_LABELS, CATEGORY_BY_KEY, toCategoryKey } from '@/lib/categories'
 import { categoryIconProps } from '@/lib/category-icon'
 
@@ -522,7 +523,7 @@ export default function PostForm() {
                     }`}>
                     <div className="flex items-center gap-3 mb-3">
                       {helper.avatarUrl ? (
-                        <img src={helper.avatarUrl} alt={helper.name} className="h-12 w-12 rounded-2xl object-cover shrink-0" />
+                        <Image src={helper.avatarUrl} alt={helper.name} width={48} height={48} className="h-12 w-12 rounded-2xl object-cover shrink-0" />
                       ) : (
                         <div className="h-12 w-12 rounded-2xl flex items-center justify-center text-white font-bold text-sm shrink-0"
                           style={{ background: avatarColor(helper.name) }}>
@@ -647,7 +648,7 @@ export default function PostForm() {
                   </div>
                   <div className="flex items-center gap-3">
                     {selectedHelper.avatarUrl ? (
-                      <img src={selectedHelper.avatarUrl} alt={selectedHelper.name} className="h-11 w-11 rounded-xl object-cover shrink-0" />
+                      <Image src={selectedHelper.avatarUrl} alt={selectedHelper.name} width={44} height={44} className="h-11 w-11 rounded-xl object-cover shrink-0" />
                     ) : (
                       <div className="h-11 w-11 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
                         style={{ background: avatarColor(selectedHelper.name) }}>
