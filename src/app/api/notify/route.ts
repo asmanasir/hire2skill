@@ -8,7 +8,6 @@ import { logServerEvent } from '@/lib/telemetry'
 import {
   pushBookingAccepted,
   pushBookingDeclined,
-  pushNewBooking,
   pushNewMessage,
 } from '@/lib/notify/push-copy-no'
 

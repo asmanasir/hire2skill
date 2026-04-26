@@ -24,7 +24,6 @@ export default function ExploreMenu() {
 
   useLayoutEffect(() => {
     if (!open || !narrow) {
-      if (!open) setMenuPos(null)
       return
     }
     const el = btnRef.current

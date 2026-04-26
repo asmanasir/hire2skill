@@ -69,7 +69,8 @@ export function TaskersLeafletMap({
 }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
-    setMounted(true)
+    const id = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(id)
   }, [])
 
   const allPoints = useMemo(

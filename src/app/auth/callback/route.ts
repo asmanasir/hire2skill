@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/onboarding`)
   }
 
-  let redirectUrl =
+  const redirectUrl =
     type === 'recovery'
       ? `${origin}/reset-password`
       : `${origin}/onboarding`

@@ -10,6 +10,7 @@ import ExploreMenu from './ExploreMenu'
 import MessagesNavLink from './MessagesNavLink'
 import MobileNavSheet from './MobileNavSheet'
 import { useLanguage } from '@/context/LanguageContext'
+import { usePathname } from 'next/navigation'
 
 export default function NavbarClient({
   userId,
@@ -21,6 +22,7 @@ export default function NavbarClient({
   unreadCount: number
 }) {
   const { t } = useLanguage()
+  const pathname = usePathname()
   const isLoggedIn = Boolean(userId)
 
   return (
@@ -48,7 +50,7 @@ export default function NavbarClient({
               </Link>
               <RequestBell userId={userId} />
               <LogoutButton />
-              <MobileNavSheet userEmail={userEmail} unreadCount={unreadCount} />
+              <MobileNavSheet key={pathname} userEmail={userEmail} unreadCount={unreadCount} />
               <div className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full text-white text-sm font-bold shadow-sm" style={{ background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)' }}>
                 {userEmail?.[0].toUpperCase()}
               </div>

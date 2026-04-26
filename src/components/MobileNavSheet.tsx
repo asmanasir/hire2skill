@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/context/LanguageContext'
 import { Bell, LayoutDashboard, LogOut, Menu, MessageCircle, UserRound, X } from 'lucide-react'
@@ -14,14 +14,9 @@ type Props = {
 
 export default function MobileNavSheet({ userEmail, unreadCount }: Props) {
   const { t } = useLanguage()
-  const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-
-  useEffect(() => {
-    setOpen(false)
-  }, [pathname])
 
   useEffect(() => {
     if (!open) return
