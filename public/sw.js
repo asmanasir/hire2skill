@@ -1,6 +1,7 @@
 // Hire2Skill Service Worker — push notifications + offline shell
 
-const CACHE = 'hire2skill-v1'
+// Bump when offline shell or core SW behavior changes (old caches cleared on activate).
+const CACHE = 'hire2skill-v2'
 const OFFLINE_URL = '/offline'
 
 // ── Install: cache the offline fallback page ─────────────────────────────────
@@ -53,17 +54,19 @@ self.addEventListener('push', (e) => {
 // ── Notification click: focus existing tab or open new one ────────────────────
 self.addEventListener('notificationclick', (e) => {
   e.notification.close()
-  const target = e.notification.data?.url ?? '/'
+  const raw = e.notification.data?.url ?? '/'
+  const targetUrl = new URL(raw, self.location.origin).href
 
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const targetPath = new URL(targetUrl).pathname
       for (const client of list) {
         const url = new URL(client.url)
-        if (url.pathname === new URL(target, self.location.origin).pathname) {
+        if (url.origin === self.location.origin && url.pathname === targetPath) {
           return client.focus()
         }
       }
-      return self.clients.openWindow(target)
+      return self.clients.openWindow(targetUrl)
     })
   )
 })

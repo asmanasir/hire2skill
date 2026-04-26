@@ -9,6 +9,8 @@ import { Search, X, LayoutGrid, Map } from 'lucide-react'
 import { CATEGORY_BY_KEY, CATEGORY_LABEL_BY_KEY, CATEGORY_LABELS, toCategoryKey } from '@/lib/categories'
 import { categoryIconProps } from '@/lib/category-icon'
 import { helperCityKey } from '@/lib/helper-city-key'
+import { centroidLatLng, cityCenterLatLng, latLngForTasker } from '@/lib/geo/norway-city-centers'
+import { TaskersLeafletMap } from '@/components/maps/TaskersLeafletMap'
 
 type Tasker = {
   id: string
@@ -17,6 +19,8 @@ type Tasker = {
   hourly_rate: number
   categories: string[]
   location: string
+  latitude: number | null
+  longitude: number | null
   verified: boolean
   tasks_done: number
   rating: number
@@ -50,153 +54,227 @@ const CITY_ZONES: Record<string, { x: number; y: number; label: string }> = {
   'ålesund':      { x: 24, y: 32, label: 'Ålesund' },
 }
 
+const MAP_CLUSTER_MIN = 13
+
 function MapView({
   taskers,
   bookLabel,
   ui,
+  categoryLabel,
+  categoryAccentHex,
 }: {
   taskers: Tasker[]
   bookLabel: string
+  categoryLabel: string
+  categoryAccentHex: string | null
   ui: {
     mapAriaShowHelpersInCity: (count: number, city: string) => string
     mapClosePreview: string
     mapHelpersAcrossNorway: (count: number) => string
+    mapSearchPlaceholder: string
+    mapFooterHint: string
+    mapNoHelpersOnMap: string
+    mapCategoryBadge: (label: string) => string
+    mapClusterAria: (count: number, city: string) => string
     perHourShort: string
   }
 }) {
   const [activePinKey, setActivePinKey] = useState<string | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [focusedTaskerId, setFocusedTaskerId] = useState<string | null>(null)
 
-  // Group taskers by city zone
-  const pins = taskers.reduce<{ key: string; zone: { x: number; y: number; label: string }; items: Tasker[] }[]>((acc, t) => {
-    const key = helperCityKey(t.location)
-    const zone = CITY_ZONES[key] ?? CITY_ZONES['oslo']
-    const existing = acc.find(p => p.key === key)
-    if (existing) { existing.items.push(t); return acc }
-    return [...acc, { key, zone, items: [t] }]
-  }, [])
+  const pins = useMemo(
+    () =>
+      taskers.reduce<{ key: string; zone: { x: number; y: number; label: string }; items: Tasker[] }[]>((acc, t) => {
+        const key = helperCityKey(t.location)
+        const zone = CITY_ZONES[key] ?? CITY_ZONES['oslo']
+        const existing = acc.find(p => p.key === key)
+        if (existing) {
+          existing.items.push(t)
+          return acc
+        }
+        return [...acc, { key, zone, items: [t] }]
+      }, []),
+    [taskers],
+  )
+
+  const preview = useMemo(() => {
+    if (focusedTaskerId) {
+      return taskers.find(t => t.id === focusedTaskerId) ?? null
+    }
+    if (!activePinKey) return null
+    const pin = pins.find(p => p.key === activePinKey)
+    const items = pin?.items ?? []
+    return items[activeIndex] ?? items[0] ?? null
+  }, [focusedTaskerId, activePinKey, activeIndex, pins, taskers])
+
+  const ringColor = categoryAccentHex ?? '#ffffff'
+
+  function closePreview() {
+    setActivePinKey(null)
+    setActiveIndex(0)
+    setFocusedTaskerId(null)
+  }
+
+  const leafletPins = useMemo(
+    () =>
+      pins.map(pin => {
+        const positions = pin.items.map((t, i) => ({
+          tasker: t,
+          latlng: latLngForTasker(pin.key, t.latitude, t.longitude, t.id, i),
+        }))
+        const coords = positions.map(p => p.latlng)
+        const center =
+          coords.length > 0 ? centroidLatLng(coords, pin.key) : cityCenterLatLng(pin.key)
+        return {
+          key: pin.key,
+          label: pin.zone.label,
+          items: pin.items,
+          center,
+          positions,
+        }
+      }),
+    [pins],
+  )
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-gray-200 bg-white" style={{ height: 480 }}>
-      {/* Norway SVG outline map */}
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice">
-        <rect width="100" height="100" fill="#EFF6FF" />
-        {/* Simplified Norway landmass */}
-        <path d="M30 5 Q40 3 50 8 Q58 6 60 10 Q65 8 68 14 Q72 12 74 18 Q78 15 80 22
-                 Q82 20 84 28 Q86 26 85 35 Q88 33 87 42 Q90 40 88 50
-                 Q90 52 88 60 Q89 65 86 70 Q88 75 84 78 Q82 82 78 84
-                 Q74 88 70 86 Q65 90 60 87 Q55 92 50 88 Q44 92 40 87
-                 Q35 90 32 85 Q28 88 26 82 Q22 84 22 78 Q18 80 20 72
-                 Q16 70 18 62 Q14 60 16 52 Q12 48 15 40 Q11 36 14 28
-                 Q10 24 14 18 Q12 14 17 10 Q20 6 25 5 Z"
-          fill="#DBEAFE" stroke="#93C5FD" strokeWidth="0.5" />
-        {/* Water body */}
-        <text x="5" y="50" fontSize="3" fill="#60A5FA" fontWeight="bold" opacity="0.6">North Sea</text>
-        <text x="62" y="25" fontSize="2.5" fill="#60A5FA" opacity="0.6">Norwegian Sea</text>
-      </svg>
-
-      {/* City pins */}
-      {pins.map(pin => (
-        <button key={pin.key} type="button"
-          onClick={() => {
-            if (activePinKey === pin.key) {
-              setActivePinKey(null)
-              setActiveIndex(0)
+    <div
+      className="relative w-full overflow-hidden rounded-2xl border border-gray-200/90 bg-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
+      style={{ minHeight: 440, height: 'min(56vh, 520px)' }}
+    >
+      <div className="absolute inset-0 z-0">
+        <TaskersLeafletMap
+          pins={leafletPins}
+          clusterMin={MAP_CLUSTER_MIN}
+          ringColor={ringColor}
+          activePinKey={activePinKey}
+          focusedTaskerId={focusedTaskerId}
+          onClusterClick={key => {
+            setFocusedTaskerId(null)
+            if (activePinKey === key) {
+              closePreview()
               return
             }
-            setActivePinKey(pin.key)
+            setActivePinKey(key)
             setActiveIndex(0)
           }}
-          aria-label={ui.mapAriaShowHelpersInCity(pin.items.length, pin.zone.label)}
-          className="absolute transform -translate-x-1/2 -translate-y-full group"
-          style={{ left: `${pin.zone.x}%`, top: `${pin.zone.y}%`, zIndex: activePinKey === pin.key ? 20 : 10 }}>
-          <div className="flex flex-col items-center">
-            <div className="rounded-full text-white text-xs font-extrabold px-2.5 py-1 shadow-lg transition-transform group-hover:scale-110 flex items-center gap-1"
-              style={{ background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)', minWidth: 28 }}>
-              {pin.items.length}
-            </div>
-            <div className="w-0 h-0 border-l-4 border-r-4 border-t-6 border-l-transparent border-r-transparent"
-              style={{ borderTopColor: '#1E3A8A' }} />
-            <span className="text-[9px] font-bold text-blue-900 mt-0.5 bg-white/80 rounded px-1">{pin.zone.label}</span>
-          </div>
-        </button>
-      ))}
+          onTaskerClick={id => {
+            setActivePinKey(null)
+            setActiveIndex(0)
+            setFocusedTaskerId(prev => (prev === id ? null : id))
+          }}
+        />
+      </div>
 
-      {/* Popup */}
-      {activePinKey && (
-        <div className="absolute bottom-4 left-4 right-4 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 z-30">
+      {/* FINN-style top bar */}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 z-[1700] flex flex-col items-center gap-2 px-3 pt-3 sm:pt-4">
+        <div
+          className="pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-full border border-gray-200/90 bg-white/95 px-4 py-2.5 shadow-md backdrop-blur-sm"
+          style={{ boxShadow: '0 8px 30px rgba(15,23,42,0.08)' }}
+        >
+          <Search size={16} className="shrink-0 text-gray-400" aria-hidden />
+          <span className="truncate text-sm text-gray-400">{ui.mapSearchPlaceholder}</span>
+        </div>
+        {categoryLabel !== 'All' && (
+          <span className="pointer-events-auto rounded-full border border-gray-200 bg-white/95 px-3 py-1 text-[11px] font-bold text-gray-800 shadow-sm">
+            {ui.mapCategoryBadge(categoryLabel)}
+          </span>
+        )}
+      </div>
+
+      {taskers.length === 0 && (
+        <div className="absolute inset-0 z-[1500] flex items-center justify-center bg-white/55 px-6 backdrop-blur-[1px]">
+          <p className="max-w-sm text-center text-sm font-semibold text-gray-700">{ui.mapNoHelpersOnMap}</p>
+        </div>
+      )}
+
+      {preview && (
+        <div className="absolute bottom-3 left-3 right-3 z-[1800] rounded-2xl border border-gray-200/90 bg-white p-3.5 shadow-2xl sm:bottom-4 sm:left-4 sm:right-4 sm:p-4">
           <div className="flex items-center gap-3">
-            {(() => {
-              const activePin = pins.find(p => p.key === activePinKey)
-              if (!activePin) return null
-              const current = activePin.items[activeIndex] ?? activePin.items[0]
-              if (!current) return null
-              return (
-                <>
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
-              style={{ background: AVATAR_COLORS[current.display_name.charCodeAt(0) % AVATAR_COLORS.length] }}>
-              {current.display_name.split(' ').map(w => w[0]?.toUpperCase()).join('').slice(0, 2)}
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white"
+              style={{ background: AVATAR_COLORS[preview.display_name.charCodeAt(0) % AVATAR_COLORS.length] }}
+            >
+              {preview.display_name
+                .split(' ')
+                .map(w => w[0]?.toUpperCase())
+                .join('')
+                .slice(0, 2)}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-sm truncate">{current.display_name}</p>
-              <p className="text-xs text-gray-400">
-                {current.location} · {current.hourly_rate > 0 ? `${current.hourly_rate} ${ui.perHourShort}` : ui.perHourShort}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-gray-900">{preview.display_name}</p>
+              <p className="text-xs text-gray-500">
+                {preview.location} ·{' '}
+                {preview.hourly_rate > 0 ? `${preview.hourly_rate} ${ui.perHourShort}` : ui.perHourShort}
               </p>
             </div>
-            <div className="flex gap-2">
-              <Link href={`/taskers/${current.id}`}
-                className="rounded-xl px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity"
-                style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href={`/taskers/${preview.id}`}
+                className="rounded-xl px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                style={{ background: 'linear-gradient(90deg,#171717,#404040)' }}
+              >
                 {bookLabel}
               </Link>
-              <button onClick={() => setActivePinKey(null)} aria-label={ui.mapClosePreview} className="text-gray-400 hover:text-gray-600 px-1">✕</button>
+              <button type="button" onClick={closePreview} aria-label={ui.mapClosePreview} className="px-1 text-gray-400 hover:text-gray-600">
+                ✕
+              </button>
+              {activePinKey && !focusedTaskerId && (pins.find(p => p.key === activePinKey)?.items.length ?? 0) > 1 && (
+                <div className="ml-1 flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const n = pins.find(p => p.key === activePinKey)?.items.length ?? 1
+                      setActiveIndex(i => (i - 1 + n) % n)
+                    }}
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    ‹
+                  </button>
+                  <span className="px-1 text-[11px] text-gray-400">
+                    {activeIndex + 1}/{pins.find(p => p.key === activePinKey)?.items.length ?? 0}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const n = pins.find(p => p.key === activePinKey)?.items.length ?? 1
+                      setActiveIndex(i => (i + 1) % n)
+                    }}
+                    className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
             </div>
-            {activePin.items.length > 1 && (
-              <div className="ml-2 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveIndex(i => (i - 1 + activePin.items.length) % activePin.items.length)}
-                  className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                >
-                  ‹
-                </button>
-                <span className="text-[11px] text-gray-400 px-1">
-                  {activeIndex + 1}/{activePin.items.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setActiveIndex(i => (i + 1) % activePin.items.length)}
-                  className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                >
-                  ›
-                </button>
-              </div>
-            )}
-                </>
-              )
-            })()}
           </div>
         </div>
       )}
 
-      <div className="absolute top-3 left-3 bg-white/90 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm border border-gray-100">
+      <div className="absolute left-3 top-[4.5rem] z-[1600] max-w-[min(100%-1.5rem,280px)] rounded-xl border border-gray-200/90 bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur-sm sm:top-[5.25rem]">
         {ui.mapHelpersAcrossNorway(taskers.length)}
       </div>
+
+      {taskers.length > 0 && !preview && (
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-[1650] flex justify-center pb-1 sm:bottom-4">
+          <p className="rounded-full border border-sky-100 bg-sky-50/95 px-3 py-1.5 text-center text-[10px] font-medium text-sky-900 shadow-sm sm:text-[11px]">
+            {ui.mapFooterHint}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
-
-type SortBy = 'recommended' | 'price_asc' | 'price_desc' | 'most_reviews' | 'top_rated'
 
 function Stars({ rating }: { rating: number }) {
   return (
     <span className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(i => (
-        <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill={i <= Math.round(rating) ? '#F59E0B' : '#E5E7EB'}>
+        <svg key={i} width="11" height="11" viewBox="0 0 24 24" fill={i <= Math.round(rating) ? '#F59E0B' : '#E5E7EB'} className="sm:w-[13px] sm:h-[13px]">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
       ))}
-      <span className="ml-1 text-xs font-bold text-gray-700">{rating.toFixed(1)}</span>
+      <span className="ml-0.5 text-[11px] sm:text-xs font-bold text-gray-700">{rating.toFixed(1)}</span>
     </span>
   )
 }
@@ -232,74 +310,77 @@ function TaskerCard({
   const instantBook = tasker.verified && tasker.rating >= 4.8
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-5 hover:border-blue-300 hover:shadow-lg transition-all duration-200 flex flex-col relative overflow-hidden">
-      <div className="flex items-start gap-3.5 mb-3.5">
+    <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-200/90 shadow-sm p-3 sm:p-4 hover:border-blue-300 hover:shadow-md transition-all duration-200 flex flex-col relative overflow-hidden">
+      <div className="flex items-start gap-2.5 sm:gap-3 mb-2 sm:mb-2.5">
         {tasker.avatar_url ? (
-          <Image src={tasker.avatar_url} alt={tasker.display_name} width={64} height={64} className="h-16 w-16 rounded-2xl object-cover shrink-0" />
+          <Image src={tasker.avatar_url} alt={tasker.display_name} width={56} height={56} className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl object-cover shrink-0" />
         ) : (
-          <div className="h-16 w-16 rounded-2xl flex items-center justify-center shrink-0 text-white font-bold text-lg shadow-sm"
+          <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 text-white font-bold text-sm sm:text-base shadow-sm"
             style={{ background: color }}>
             {initials}
           </div>
         )}
-        <div className="flex-1 min-w-0 pr-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-extrabold text-gray-900 text-[15px] leading-tight">{tasker.display_name}</h3>
+        <div className="flex-1 min-w-0 pr-1 sm:pr-2">
+          <div className="flex items-center gap-1 flex-wrap">
+            <h3 className="font-extrabold text-gray-900 text-sm sm:text-[15px] leading-tight">{tasker.display_name}</h3>
             {isElite(tasker) && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold border"
+              <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] sm:text-[10px] font-bold border shrink-0"
                 style={{ background: 'linear-gradient(135deg,#fef9c3,#fde68a)', color: '#92400e', borderColor: '#fcd34d' }}>
                 ★ {ui.elite}
               </span>
             )}
+          </div>
+          {/* One compact row: badges · location · rating (scrolls horizontally on very narrow screens) */}
+          <div className="mt-1 flex min-w-0 items-center gap-x-1.5 gap-y-0 overflow-x-auto sm:flex-wrap sm:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {instantBook && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-100">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-blue-50 px-1 py-px text-[9px] sm:text-[10px] font-bold text-blue-700 border border-blue-100">
+                <svg width="7" height="7" className="sm:w-2 sm:h-2" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 {ui.instantBook}
               </span>
             )}
             {tasker.verified && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700 border border-green-100">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-green-50 px-1 py-px text-[9px] sm:text-[10px] font-semibold text-green-700 border border-green-100">
+                <svg width="7" height="7" className="sm:w-2 sm:h-2" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 {ui.verified}
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-1 mt-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span className="text-xs text-gray-400">{tasker.location}</span>
-          </div>
-          <div className="mt-1.5 flex items-center gap-2">
-            <Stars rating={tasker.rating} />
-            {(tasker.review_count ?? 0) > 0 && (
-              <span className="text-xs text-gray-400">({ui.reviews(tasker.review_count ?? 0)})</span>
-            )}
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-[9px] sm:text-[10px] text-gray-400">
+              <svg width="10" height="10" className="shrink-0 sm:w-2.5 sm:h-2.5" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span className="max-w-[4.5rem] truncate sm:max-w-[7rem]">{tasker.location}</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 border-l border-gray-200 pl-1.5">
+              <Stars rating={tasker.rating} />
+              {(tasker.review_count ?? 0) > 0 && (
+                <span className="text-[9px] sm:text-[10px] text-gray-400 whitespace-nowrap">({ui.reviews(tasker.review_count ?? 0)})</span>
+              )}
+            </span>
           </div>
         </div>
-        <div className="text-right shrink-0 pl-2 min-w-[86px] pt-5">
-          <p className="text-2xl font-extrabold text-gray-900 leading-none">{tasker.hourly_rate} NOK</p>
-          <p className="text-xs text-gray-400">{ui.perHour}</p>
+        <div className="text-right shrink-0 pl-1 min-w-[4.5rem] sm:min-w-[5.25rem] self-start pt-0 sm:pt-0.5">
+          <p className="text-lg sm:text-xl font-extrabold text-gray-900 leading-none tabular-nums">{tasker.hourly_rate} NOK</p>
+          <p className="text-[10px] sm:text-xs text-gray-400">{ui.perHour}</p>
         </div>
       </div>
 
-      <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-3 min-h-[3.9rem]">{tasker.bio}</p>
+      <p className="text-xs sm:text-sm text-gray-600 leading-snug mb-2 line-clamp-2 sm:line-clamp-3">{tasker.bio}</p>
 
-      <div className="flex items-center gap-4 text-xs text-gray-400 mb-4 rounded-xl bg-gray-50 px-2.5 py-2">
-        <span className="flex items-center gap-1.5">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] sm:text-xs text-gray-400 mb-2 rounded-lg sm:rounded-xl bg-gray-50 px-2 py-1.5 sm:py-2">
+        <span className="flex items-center gap-1 shrink-0">
+          <svg width="12" height="12" className="sm:w-[13px] sm:h-[13px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           {ui.tasksCount(tasker.tasks_done)}
         </span>
-        <span className="flex items-center gap-1.5">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span className="flex items-center gap-1 shrink-0">
+          <svg width="12" height="12" className="sm:w-[13px] sm:h-[13px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           {ui.responseWithinHours(tasker.response_hours)}
         </span>
-        <div className="flex gap-1 ml-auto">
+        <div className="flex flex-wrap gap-1 w-full sm:w-auto sm:ml-auto sm:justify-end">
           {tasker.categories.slice(0, 2).map(c => {
             const meta = CATEGORY_BY_KEY[toCategoryKey(c)]
             const ChipIcon = meta?.Icon
             return (
-              <span key={c} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+              <span key={c} className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px sm:px-2 sm:py-0.5 text-[10px] sm:text-xs font-semibold"
                 style={{ background: meta?.bg ?? '#EFF6FF', color: meta?.color ?? '#2563EB' }}>
-                {ChipIcon && <ChipIcon {...categoryIconProps(12, meta?.color ?? '#2563EB')} />}
+                {ChipIcon && <ChipIcon {...categoryIconProps(11, meta?.color ?? '#2563EB')} />}
                 {CATEGORY_LABEL_BY_KEY[toCategoryKey(c)] ?? c}
               </span>
             )
@@ -307,37 +388,38 @@ function TaskerCard({
         </div>
       </div>
 
-      <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2">
-        <p className="text-[11px] font-bold text-blue-900 mb-1">{ui.trustSignalsTitle}</p>
-        <div className="flex flex-wrap gap-1.5">
+      {/* Compact trust row: hide titled box on narrow screens, show chips only */}
+      <div className="mb-2 sm:mb-2.5 rounded-lg sm:rounded-xl border border-blue-100 bg-blue-50/70 px-2 py-1.5 sm:px-2.5 sm:py-2">
+        <p className="hidden sm:block text-[10px] font-bold text-blue-900 mb-1">{ui.trustSignalsTitle}</p>
+        <div className="flex flex-wrap gap-1">
           {tasker.verified && (
-            <span className="rounded-full bg-white border border-green-200 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+            <span className="rounded-full bg-white border border-green-200 px-1.5 py-px sm:px-2 sm:py-0.5 text-[9px] sm:text-[10px] font-semibold text-green-700">
               {ui.trustVerifiedId}
             </span>
           )}
           {tasker.response_hours <= 2 && (
-            <span className="rounded-full bg-white border border-blue-200 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+            <span className="rounded-full bg-white border border-blue-200 px-1.5 py-px sm:px-2 sm:py-0.5 text-[9px] sm:text-[10px] font-semibold text-blue-700">
               {ui.trustFastResponse}
             </span>
           )}
           {tasker.rating >= 4.8 && (
-            <span className="rounded-full bg-white border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+            <span className="rounded-full bg-white border border-amber-200 px-1.5 py-px sm:px-2 sm:py-0.5 text-[9px] sm:text-[10px] font-semibold text-amber-700">
               {ui.trustTopRated}
             </span>
           )}
-          <span className="rounded-full bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+          <span className="rounded-full bg-white border border-slate-200 px-1.5 py-px sm:px-2 sm:py-0.5 text-[9px] sm:text-[10px] font-semibold text-slate-700">
             {ui.trustCompletedJobs(tasker.tasks_done)}
           </span>
         </div>
       </div>
 
-      <div className="flex gap-2.5 mt-auto pt-3.5 border-t border-gray-100">
+      <div className="flex gap-2 mt-auto pt-2 border-t border-gray-100">
         <Link href={`/taskers/${tasker.id}`}
-          className="flex-1 rounded-xl py-2.5 text-sm font-bold text-blue-600 border border-blue-200 text-center hover:bg-blue-50 transition-all">
+          className="flex-1 rounded-lg sm:rounded-xl py-2 text-xs sm:text-sm font-bold text-blue-600 border border-blue-200 text-center hover:bg-blue-50 transition-all">
           {ui.viewProfile}
         </Link>
         <Link href={`/taskers/${tasker.id}`}
-          className="flex-1 rounded-xl py-2.5 text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
+          className="flex-1 rounded-lg sm:rounded-xl py-2 text-xs sm:text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
           style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
           {bookLabel}
         </Link>
@@ -365,14 +447,6 @@ export default function TaskersContent({
     statsHelpers: tt.statsHelpers ?? '2,400+ helpers',
     statsTasksCompleted: tt.statsTasksCompleted ?? '8,000+ tasks completed',
     statsResponse: tt.statsResponse ?? 'Avg. response < 2 hours',
-    anyLocation: tt.anyLocation ?? 'Any location',
-    anyRating: tt.anyRating ?? 'Any rating',
-    anyAvailability: tt.anyAvailability ?? 'Any availability',
-    availableNow: tt.availableNow ?? 'Available now (< 1h)',
-    respondsQuickly: tt.respondsQuickly ?? 'Responds quickly (< 2h)',
-    withinFourHours: tt.withinFourHours ?? 'Within 4 hours',
-    clear: tt.clear ?? 'Clear',
-    sortLabel: tt.sortLabel ?? 'Sort:',
     helpersFound: (count: number) => tt.helpersFound?.(count) ?? `${count} helper${count === 1 ? '' : 's'} found`,
     clearFilters: tt.clearFilters ?? 'clear filters',
     popularThisSpring: tt.popularThisSpring ?? 'Popular this spring',
@@ -399,6 +473,12 @@ export default function TaskersContent({
     mapClosePreview: tt.mapClosePreview ?? 'Close map preview',
     mapHelpersAcrossNorway: (count: number) =>
       tt.mapHelpersAcrossNorway?.(count) ?? `${count} helper${count === 1 ? '' : 's'} across Norway`,
+    mapSearchPlaceholder: tt.mapSearchPlaceholder ?? 'Search for an area on the map',
+    mapFooterHint: tt.mapFooterHint ?? 'Use the category row above to filter by service. Tap a dot to preview.',
+    mapNoHelpersOnMap: tt.mapNoHelpersOnMap ?? 'No helpers match your filters — try another category or clear filters.',
+    mapCategoryBadge: (label: string) => tt.mapCategoryBadge?.(label) ?? `Service: ${label}`,
+    mapClusterAria: (count: number, city: string) =>
+      tt.mapClusterAria?.(count, city) ?? `${count} helpers in ${city}, show list`,
     trustSignalsTitle: tt.trustSignalsTitle ?? 'Trust signals',
     trustVerifiedId: tt.trustVerifiedId ?? 'Verified ID',
     trustFastResponse: tt.trustFastResponse ?? 'Fast response',
@@ -422,16 +502,6 @@ export default function TaskersContent({
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [category, setCategory] = useState(activeCategory ?? 'All')
-  const [priceMin, setPriceMin] = useState('')
-  const [priceMax, setPriceMax] = useState('')
-  const [location, setLocation] = useState('All')
-  const [minRating, setMinRating] = useState(0)
-  const [maxResponseHours, setMaxResponseHours] = useState(24)
-  const [sortBy, setSortBy] = useState<SortBy>('recommended')
-  const [wantNorwegian, setWantNorwegian] = useState(false)
-  const [wantEnglish, setWantEnglish] = useState(false)
-  const [wantTools, setWantTools] = useState(false)
-  const [wantInvoice, setWantInvoice] = useState(false)
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), 280)
@@ -445,24 +515,7 @@ export default function TaskersContent({
     }
   }, [posted])
 
-  const locations = useMemo(() => {
-    const set = new Set(taskers.map(t => t.location).filter(Boolean))
-    return ['All', ...Array.from(set).sort()]
-  }, [taskers])
-
-  const hasActiveFilters = !!(
-    debouncedQuery ||
-    category !== 'All' ||
-    priceMin ||
-    priceMax ||
-    location !== 'All' ||
-    minRating > 0 ||
-    maxResponseHours < 24 ||
-    wantNorwegian ||
-    wantEnglish ||
-    wantTools ||
-    wantInvoice
-  )
+  const hasActiveFilters = !!(debouncedQuery || category !== 'All')
 
   const filtered = useMemo(() => {
     let list = [...taskers]
@@ -471,11 +524,6 @@ export default function TaskersContent({
       const key = citySlug.toLowerCase()
       list = list.filter(t => helperCityKey(t.location) === key)
     }
-
-    const norwegianSignals = /(norsk|bokmål|bokmaal|nynorsk|snakker norsk|taler norsk|på norsk|norwegian|fluent norwegian)/i
-    const englishSignals = /(english|engelsk|fluent english|business english|comfortable in english|native english)/i
-    const toolSignals = /(tools?|utstyr|equipment|drill|driver|snekker|håndverk|handverk|maskin|lift|stillas|scaffold|varebil|van\b|trail)/i
-    const invoiceSignals = /(invoice|faktura|mva\b|vat\b|org\.?\s*nr|orgnr|foretak|enk\b|as\b|vat\-?registered)/i
 
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.toLowerCase()
@@ -487,56 +535,20 @@ export default function TaskersContent({
       )
     }
 
-    if (wantNorwegian) {
-      list = list.filter(t => {
-        const langs = (t.languages ?? []).map(l => l.toLowerCase())
-        return langs.includes('no') || langs.includes('nb') || langs.includes('nn') || norwegianSignals.test(t.bio)
-      })
-    }
-    if (wantEnglish) {
-      list = list.filter(t => {
-        const langs = (t.languages ?? []).map(l => l.toLowerCase())
-        return langs.includes('en') || englishSignals.test(t.bio)
-      })
-    }
-    if (wantTools) list = list.filter(t => t.brings_tools === true || toolSignals.test(t.bio))
-    if (wantInvoice) list = list.filter(t => t.can_invoice === true || invoiceSignals.test(t.bio))
-
     if (category !== 'All') {
       const activeKey = toCategoryKey(category)
       list = list.filter(t => t.categories.some(c => toCategoryKey(c) === activeKey))
     }
-    if (priceMin)           list = list.filter(t => t.hourly_rate >= Number(priceMin))
-    if (priceMax)           list = list.filter(t => t.hourly_rate <= Number(priceMax))
-    if (location !== 'All') list = list.filter(t => t.location === location)
-    if (minRating > 0)      list = list.filter(t => t.rating >= minRating)
-    if (maxResponseHours < 24) list = list.filter(t => t.response_hours <= maxResponseHours)
 
-    switch (sortBy) {
-      case 'price_asc':    list.sort((a, b) => a.hourly_rate - b.hourly_rate); break
-      case 'price_desc':   list.sort((a, b) => b.hourly_rate - a.hourly_rate); break
-      case 'most_reviews': list.sort((a, b) => (b.review_count ?? b.tasks_done) - (a.review_count ?? a.tasks_done)); break
-      case 'top_rated':    list.sort((a, b) => b.rating - a.rating); break
-      default:             list.sort((a, b) => (b.rating * 20 + b.tasks_done) - (a.rating * 20 + a.tasks_done))
-    }
+    list.sort((a, b) => (b.rating * 20 + b.tasks_done) - (a.rating * 20 + a.tasks_done))
 
     return list
-  }, [taskers, citySlug, debouncedQuery, category, priceMin, priceMax, location, minRating, maxResponseHours, sortBy, wantNorwegian, wantEnglish, wantTools, wantInvoice])
+  }, [taskers, citySlug, debouncedQuery, category])
 
   function clearAll() {
     setQuery('')
     setDebouncedQuery('')
     setCategory('All')
-    setPriceMin('')
-    setPriceMax('')
-    setLocation('All')
-    setMinRating(0)
-    setMaxResponseHours(24)
-    setSortBy('recommended')
-    setWantNorwegian(false)
-    setWantEnglish(false)
-    setWantTools(false)
-    setWantInvoice(false)
   }
 
   return (
@@ -555,10 +567,10 @@ export default function TaskersContent({
       )}
 
       {/* Header + Search */}
-      <div className="bg-white border-b border-gray-200 px-6 py-8">
+      <div className="bg-white border-b border-gray-200 px-4 py-6 sm:px-6 sm:py-8">
         <div className="mx-auto max-w-6xl">
-          <h1 className="text-[30px] leading-tight font-extrabold text-gray-900 mb-2">{pageTitle}</h1>
-          <p className="text-gray-500 text-[15px]">{pageSubtitle}</p>
+          <h1 className="text-2xl sm:text-[30px] leading-tight font-extrabold text-gray-900 mb-2">{pageTitle}</h1>
+          <p className="text-gray-500 text-sm sm:text-[15px]">{pageSubtitle}</p>
           {citySlug && tt.cityLanding?.browseAllNorway && (
             <p className="mt-2">
               <Link href="/taskers" className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
@@ -566,8 +578,6 @@ export default function TaskersContent({
               </Link>
             </p>
           )}
-          <p className="text-xs text-gray-400 mt-3 max-w-2xl leading-relaxed">{tt.trustLine}</p>
-
           {/* Search bar */}
           <div className="relative mt-6 w-full">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" style={{ zIndex: 1 }} />
@@ -587,7 +597,7 @@ export default function TaskersContent({
             )}
           </div>
 
-          <div className="flex flex-wrap gap-6 mt-6 text-sm text-gray-500">
+          <div className="mt-6 hidden sm:flex flex-wrap gap-6 text-sm text-gray-500">
             {[
               { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, label: ui.statsHelpers },
               { icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>, label: ui.statsTasksCompleted },
@@ -599,83 +609,8 @@ export default function TaskersContent({
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-6">
-          <aside className="lg:sticky lg:top-24 self-start rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
-            <p className="text-sm font-bold text-gray-800">Filters</p>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">City</label>
-              <select
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer"
-              >
-                {locations.map(l => <option key={l} value={l}>{l === 'All' ? ui.anyLocation : l}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Price (NOK)</label>
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm">
-              <span className="text-gray-400 text-xs font-medium">NOK</span>
-              <input type="number" placeholder="Min" value={priceMin} onChange={e => setPriceMin(e.target.value)} className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0" />
-              <span className="text-gray-300 text-xs">–</span>
-              <input type="number" placeholder="Max" value={priceMax} onChange={e => setPriceMax(e.target.value)} className="w-14 outline-none text-gray-700 placeholder-gray-300" min="0" />
-            </div>
-            </div>
-
-            <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Rating</label>
-            <select value={minRating} onChange={e => setMinRating(Number(e.target.value))}
-              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
-              <option value={0}>{ui.anyRating}</option>
-              <option value={3}>★ 3+</option>
-              <option value={4}>★ 4+</option>
-              <option value={4.5}>★ 4.5+</option>
-            </select>
-            </div>
-
-            <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Availability</label>
-            <select value={maxResponseHours} onChange={e => setMaxResponseHours(Number(e.target.value))}
-              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-blue-100 cursor-pointer">
-              <option value={24}>{ui.anyAvailability}</option>
-              <option value={1}>{ui.availableNow}</option>
-              <option value={2}>{ui.respondsQuickly}</option>
-              <option value={4}>{ui.withinFourHours}</option>
-            </select>
-            </div>
-
-            <div className="flex flex-col gap-2 mb-4">
-              <button type="button" onClick={() => setWantNorwegian(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
-                style={wantNorwegian ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-                {tt.filterLangNo}
-              </button>
-              <button type="button" onClick={() => setWantEnglish(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
-                style={wantEnglish ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-                {tt.filterLangEn}
-              </button>
-              <button type="button" onClick={() => setWantTools(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
-                style={wantTools ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-                {tt.filterTools}
-              </button>
-              <button type="button" onClick={() => setWantInvoice(v => !v)} className="w-full rounded-lg px-3 py-2 text-xs font-semibold border transition-colors text-left"
-                style={wantInvoice ? { background: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' } : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-                {tt.filterInvoice}
-              </button>
-            </div>
-
-            {hasActiveFilters && (
-              <button onClick={clearAll}
-                className="w-full flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
-                <X size={13} />
-                {ui.clear}
-              </button>
-            )}
-          </aside>
-
-          <div>
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="min-w-0">
         {/* Category chips */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
           {CATEGORIES.map(cat => (
@@ -730,7 +665,13 @@ export default function TaskersContent({
 
         {/* Grid / Map */}
         {viewMode === 'map' ? (
-          <MapView taskers={filtered} bookLabel={t.home?.bookNow ?? 'Book now'} ui={ui} />
+          <MapView
+            taskers={filtered}
+            bookLabel={t.home?.bookNow ?? 'Book now'}
+            ui={ui}
+            categoryLabel={category}
+            categoryAccentHex={category !== 'All' ? CATEGORY_BY_KEY[toCategoryKey(category)]?.color ?? null : null}
+          />
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <div className="h-16 w-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -745,7 +686,7 @@ export default function TaskersContent({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filtered.map((tasker, i) => (
               <TaskerCard key={tasker.id} tasker={tasker} index={i} bookLabel={t.home?.bookNow ?? 'Book now'} ui={ui} />
             ))}
@@ -763,7 +704,6 @@ export default function TaskersContent({
             {ui.ctaButton}
           </Link>
         </div>
-          </div>
         </div>
       </div>
     </div>

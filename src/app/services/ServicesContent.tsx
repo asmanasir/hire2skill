@@ -160,43 +160,45 @@ export default function ServicesContent() {
   }, [query, activeFilter])
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 sm:py-6">
 
-      {/* Search bar */}
-      <div className="relative max-w-xl mx-auto mb-8">
-        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search services — cleaning, plumbing, tutoring…"
-          className="w-full rounded-2xl border border-gray-200 bg-white pl-11 pr-10 py-3.5 text-sm text-gray-900
-                     focus:outline-none focus:border-blue-400 shadow-sm placeholder:text-gray-400"
-        />
-        {query && (
-          <button onClick={() => setQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-            <X size={16} />
-          </button>
-        )}
-      </div>
+      {/* Search + categories — highlighted panel */}
+      <div
+        className="mb-6 sm:mb-8 rounded-2xl border-2 border-blue-200/90 bg-gradient-to-b from-white via-white to-blue-50/50 p-3 sm:p-5 shadow-[0_8px_30px_-12px_rgba(30,58,138,0.25)] ring-1 ring-blue-100/80">
+        <div className="relative max-w-2xl mx-auto mb-3 sm:mb-4">
+          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none" strokeWidth={2.25} />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search services — cleaning, plumbing, tutoring…"
+            className="w-full rounded-xl border-2 border-blue-200/80 bg-white pl-12 pr-11 py-3 sm:py-3.5 text-base text-gray-900 shadow-inner shadow-blue-900/5
+                       placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+              <X size={18} />
+            </button>
+          )}
+        </div>
 
-      {/* Filter chips */}
-      <div className="flex flex-wrap gap-2 justify-center mb-8">
-        {FILTERS.map(f => (
-          <button key={f.label}
-            onClick={() => setActiveFilter(f.label)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-              activeFilter === f.label
-                ? 'text-white shadow-sm'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600'
-            }`}
-            style={activeFilter === f.label
-              ? { background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)' }
-              : undefined}>
-            {f.label}
-          </button>
-        ))}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {FILTERS.map(f => (
+            <button key={f.label} type="button"
+              onClick={() => setActiveFilter(f.label)}
+              className={`rounded-full px-3.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold transition-all ${
+                activeFilter === f.label
+                  ? 'text-white shadow-md scale-[1.02] ring-2 ring-blue-300/60 ring-offset-1 ring-offset-white'
+                  : 'bg-white border-2 border-gray-200/90 text-gray-700 shadow-sm hover:border-blue-400 hover:text-blue-700 hover:shadow'
+              }`}
+              style={activeFilter === f.label
+                ? { background: 'linear-gradient(135deg,#1E3A8A,#38BDF8)' }
+                : undefined}>
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Result count */}
@@ -208,31 +210,33 @@ export default function ServicesContent() {
         </p>
       )}
 
-      {/* Grid */}
+      {/* Grid — compact tiles */}
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
           {filtered.map(s => (
             <Link key={s.slug} href={`/services/${s.slug}`}
-              className="group bg-white rounded-2xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-lg
-                         transition-all duration-200 flex flex-col items-start gap-3">
+              className="group bg-white rounded-xl border border-gray-200 p-3 sm:p-3.5 hover:border-blue-300 hover:shadow-md
+                         transition-all duration-200 flex flex-col items-start gap-2 min-h-0">
               {(() => {
                 const Icon = SERVICE_ICON_BY_SLUG[s.slug]
                 return (
-                  <div className="h-12 w-12 rounded-xl flex items-center justify-center"
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center shrink-0"
                     style={{ background: s.accentBg }}>
                     {Icon
-                      ? <Icon {...categoryIconProps(22, s.accentColor)} />
-                      : <span className="text-2xl">{s.emoji}</span>}
+                      ? <Icon {...categoryIconProps(18, s.accentColor)} />
+                      : <span className="text-lg sm:text-xl leading-none">{s.emoji}</span>}
                   </div>
                 )
               })()}
-              <div className="flex-1">
-                <p className="font-bold text-gray-900 text-sm group-hover:text-blue-600 transition-colors">{s.title}</p>
-                <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
+              <div className="flex-1 min-w-0 w-full">
+                <p className="font-bold text-gray-900 text-xs sm:text-sm leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
+                  {s.title}
+                </p>
+                <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 line-clamp-2 leading-snug">
                   {s.subheadline.split('—')[0].trim()}
                 </p>
               </div>
-              <span className="mt-auto text-xs font-semibold text-blue-700">
+              <span className="mt-auto text-[10px] sm:text-xs font-semibold text-blue-700">
                 From {s.priceMin} NOK →
               </span>
             </Link>

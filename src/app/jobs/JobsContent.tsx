@@ -373,17 +373,17 @@ export default function JobsContent({
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filtered.map(job => (
-            <article key={job.id} className="rounded-2xl border border-gray-200 bg-white p-5 flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-extrabold text-gray-900">{normalizeTitle(job)}</h2>
-                  <p className="text-xs text-gray-400 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <article key={job.id} className="rounded-xl border border-gray-200 bg-white p-3.5 flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-extrabold text-gray-900 leading-snug">{normalizeTitle(job)}</h2>
+                  <p className="text-[11px] text-gray-400 mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                     <span>
                       {job.location} · {job.category} · {ui.by} {job.posterName}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 tabular-nums">
+                    <span className="rounded-full bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-600 tabular-nums">
                       {ui.proposalsLabel(job.proposalCount)}
                     </span>
                   </p>
@@ -392,8 +392,8 @@ export default function JobsContent({
                   const cat = CATEGORY_BY_KEY[toCategoryKey(job.category)] ?? CATEGORY_BY_KEY.handyman
                   const CatIcon = cat.Icon
                   return (
-                    <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: cat.bg }}>
-                      <CatIcon {...categoryIconProps(18, cat.color)} />
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: cat.bg }}>
+                      <CatIcon {...categoryIconProps(15, cat.color)} />
                     </div>
                   )
                 })()}
@@ -404,23 +404,23 @@ export default function JobsContent({
                 return (
                   <>
                     {points.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {points.map((p) => (
-                          <span key={p} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                          <span key={p} className="rounded-full bg-blue-50 px-2 py-px text-[10px] font-semibold text-blue-700">
                             {p}
                           </span>
                         ))}
                       </div>
                     )}
-                    <p className="text-sm text-gray-600 line-clamp-3">
+                    <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
                       {parsed.details}
                     </p>
                   </>
                 )
               })()}
-              <span className="text-xs text-gray-400">{new Date(job.createdAt).toLocaleDateString()}</span>
-              <div className="flex items-center justify-between mt-auto pt-2">
-                <span className="text-sm font-bold text-green-700">
+              <span className="text-[10px] text-gray-400">{new Date(job.createdAt).toLocaleDateString()}</span>
+              <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+                <span className="text-xs font-bold text-green-700 truncate">
                   {job.budget ? ui.budgetLabel(job.budget) : ui.budgetNegotiable}
                 </span>
                 <button
@@ -431,7 +431,7 @@ export default function JobsContent({
                     setMessage('')
                     setOffer('')
                   }}
-                  className="rounded-xl px-4 py-2 text-sm font-bold text-white"
+                  className="rounded-lg px-3 py-1.5 text-xs font-bold text-white shrink-0"
                   style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}
                 >
                   {ui.sendProposal}

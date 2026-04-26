@@ -355,7 +355,7 @@ export default function TaskerProfileContent({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <ConfirmActionModal
         open={confirmDuplicateOpen}
         title={d.actionConfirm ?? 'Confirm'}
@@ -367,88 +367,89 @@ export default function TaskerProfileContent({
       />
 
       {/* Breadcrumb */}
-      <div className="bg-white border-b border-gray-100 px-6 py-3">
-        <div className="mx-auto max-w-6xl flex items-center gap-2 text-sm text-gray-500">
-          <Link href="/taskers" className="hover:text-blue-600 transition-colors">{ui.findHelpers}</Link>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
-          <span className="font-semibold text-gray-800">{tasker.display_name}</span>
+      <div className="bg-white border-b border-gray-100 px-3 py-3 sm:px-6">
+        <div className="mx-auto max-w-6xl flex min-w-0 items-center gap-2 text-sm text-gray-500">
+          <Link href="/taskers" className="shrink-0 hover:text-blue-600 transition-colors">{ui.findHelpers}</Link>
+          <svg width="14" height="14" className="shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+          <span className="min-w-0 truncate font-semibold text-gray-800">{tasker.display_name}</span>
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="flex flex-col lg:flex-row gap-8">
-
+      <div className="mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-10">
+        <div className="flex min-w-0 flex-col gap-8 lg:flex-row">
+          {/* Mobile: sidebar (CTA) first; desktop: main column first */}
           {/* ── LEFT COLUMN ─────────────────────────────────────────────────── */}
-          <div className="flex-1 min-w-0 space-y-6">
+          <div className="order-2 flex-1 min-w-0 space-y-6 lg:order-1">
 
-            {/* Hero card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8">
-              <div className="flex items-start gap-6">
-                {/* Avatar */}
-                {tasker.avatar_url ? (
-                  <Image src={tasker.avatar_url} alt={tasker.display_name}
-                    width={96} height={96}
-                    className="h-24 w-24 rounded-2xl object-cover shrink-0 shadow-md" />
-                ) : (
-                  <div className="h-24 w-24 rounded-2xl flex items-center justify-center shrink-0 text-white font-bold text-2xl shadow-md"
-                    style={{ background: avatarColor }}>
-                    {initials}
-                  </div>
-                )}
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-extrabold text-gray-900">{tasker.display_name}</h1>
-                    {isElite(tasker) && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border"
-                        style={{ background: 'linear-gradient(135deg,#fef9c3,#fde68a)', color: '#92400e', borderColor: '#fcd34d' }}>
-                        ★ {ui.eliteHelper}
-                      </span>
-                    )}
-                    {tasker.verified && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 border border-green-100">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        {ui.verified}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <span className="text-sm text-gray-500">{tasker.location}</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 mb-4">
-                    <Stars rating={tasker.rating} size={18} />
-                    <span className="text-base font-extrabold text-gray-900">{tasker.rating.toFixed(1)}</span>
-                    <span className="text-sm text-gray-400">({ui.reviews(totalReviews)})</span>
-                  </div>
-
-                  {/* Quick stats */}
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                      {ui.tasksDone(tasker.tasks_done)}
+            {/* Hero card — mobile: avatar + text row, then price row; lg+: price beside */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-8 max-w-full">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
+                <div className="flex min-w-0 gap-3 sm:gap-4 lg:flex-1">
+                  {tasker.avatar_url ? (
+                    <Image src={tasker.avatar_url} alt={tasker.display_name}
+                      width={96} height={96}
+                      className="h-16 w-16 sm:h-24 sm:w-24 rounded-2xl object-cover shrink-0 shadow-md" />
+                  ) : (
+                    <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-2xl flex items-center justify-center shrink-0 text-white font-bold text-lg sm:text-2xl shadow-md"
+                      style={{ background: avatarColor }}>
+                      {initials}
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                      {ui.repliesInHours(tasker.response_hours)}
+                  )}
+
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="min-w-0 max-w-full text-lg font-extrabold text-gray-900 sm:text-2xl break-words">
+                        {tasker.display_name}
+                      </h1>
+                      {isElite(tasker) && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold border sm:px-3 sm:py-1 sm:text-xs"
+                          style={{ background: 'linear-gradient(135deg,#fef9c3,#fde68a)', color: '#92400e', borderColor: '#fcd34d' }}>
+                          ★ {ui.eliteHelper}
+                        </span>
+                      )}
+                      {tasker.verified && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-bold text-green-700 border border-green-100 sm:px-3 sm:py-1 sm:text-xs">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          {ui.verified}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-start gap-1.5 text-sm text-gray-500 min-w-0">
+                      <svg width="14" height="14" className="mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <span className="min-w-0 break-words">{tasker.location}</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 max-w-full">
+                      <span className="shrink-0"><Stars rating={tasker.rating} size={16} /></span>
+                      <span className="text-sm font-extrabold text-gray-900 sm:text-base">{tasker.rating.toFixed(1)}</span>
+                      <span className="min-w-0 text-xs text-gray-400 sm:text-sm">({ui.reviews(totalReviews)})</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-2">
+                      <div className="flex min-w-0 items-center gap-1.5 text-sm text-gray-600">
+                        <svg width="15" height="15" className="shrink-0" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        <span className="min-w-0 break-words">{ui.tasksDone(tasker.tasks_done)}</span>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-1.5 text-sm text-gray-600">
+                        <svg width="15" height="15" className="shrink-0" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        <span className="min-w-0 break-words">{ui.repliesInHours(tasker.response_hours)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Price badge */}
-                <div className="shrink-0 text-right">
-                  <p className="text-3xl font-extrabold text-gray-900">{tasker.hourly_rate}</p>
-                  <p className="text-sm text-gray-400">{ui.nokPerHour}</p>
+                <div className="flex w-full min-w-0 shrink-0 items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 lg:w-44 lg:flex-col lg:items-end lg:justify-start lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:text-right">
+                  <p className="text-xl font-extrabold text-gray-900 tabular-nums sm:text-3xl">{tasker.hourly_rate}</p>
+                  <p className="text-xs text-gray-500 sm:text-sm lg:text-gray-400">{ui.nokPerHour}</p>
                 </div>
               </div>
             </div>
 
             {/* About */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-8 max-w-full overflow-hidden">
               <h2 className="text-base font-extrabold text-gray-900 mb-4">{ui.about}</h2>
-              <p className="text-sm text-gray-600 leading-relaxed">{tasker.bio}</p>
+              <p className="text-sm text-gray-600 leading-relaxed break-words">{tasker.bio}</p>
             </div>
 
             {/* Video intro */}
@@ -555,7 +556,38 @@ export default function TaskerProfileContent({
           </div>
 
           {/* ── RIGHT COLUMN ────────────────────────────────────────────────── */}
-          <div className="lg:w-80 shrink-0 space-y-4">
+          <div className="order-1 min-w-0 w-full shrink-0 space-y-4 lg:order-2 lg:w-80">
+
+            {/* CTA — first so “Send request” is visible without scrolling (esp. mobile) */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 lg:sticky lg:top-24">
+              <div className="flex items-baseline justify-between mb-4">
+                <span className="text-2xl font-extrabold text-gray-900">{tasker.hourly_rate} NOK</span>
+                <span className="text-sm text-gray-400">{ui.perHour}</span>
+              </div>
+
+              {currentUserId === tasker.id ? (
+                <div className="rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-sm text-gray-500">
+                  {ui.thisIsYourProfile}
+                </div>
+              ) : isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={() => setShowRequest(true)}
+                  className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--sl-gradient-primary)' }}>
+                  {ui.sendRequest}
+                </button>
+              ) : (
+                <Link
+                  href={`/login?next=/taskers/${tasker.id}`}
+                  className="block w-full rounded-xl py-3.5 text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--sl-gradient-primary)' }}>
+                  {ui.loginToSendRequest}
+                </Link>
+              )}
+
+              <p className="text-xs text-gray-400 text-center mt-3">{ui.freeToSend}</p>
+            </div>
 
             {/* Availability card */}
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -619,45 +651,15 @@ export default function TaskerProfileContent({
                     label: ui.statLocation, value: tasker.location,
                   },
                 ].map(s => (
-                  <div key={s.label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div key={s.label} className="flex min-w-0 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2 text-sm text-gray-500">
                       {s.icon}
-                      {s.label}
+                      <span className="min-w-0 truncate">{s.label}</span>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">{s.value}</span>
+                    <span className="max-w-[50%] shrink-0 text-right text-sm font-bold text-gray-900 break-words">{s.value}</span>
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* CTA card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 sticky top-6">
-              <div className="flex items-baseline justify-between mb-4">
-                <span className="text-2xl font-extrabold text-gray-900">{tasker.hourly_rate} NOK</span>
-                <span className="text-sm text-gray-400">{ui.perHour}</span>
-              </div>
-
-              {currentUserId === tasker.id ? (
-                <div className="rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-sm text-gray-500">
-                  {ui.thisIsYourProfile}
-                </div>
-              ) : isLoggedIn ? (
-                <button
-                  onClick={() => setShowRequest(true)}
-                  className="w-full rounded-xl py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
-                  style={{ background: 'var(--sl-gradient-primary)' }}>
-                  {ui.sendRequest}
-                </button>
-              ) : (
-                <Link
-                  href={`/login?next=/taskers/${tasker.id}`}
-                  className="block w-full rounded-xl py-3.5 text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
-                  style={{ background: 'var(--sl-gradient-primary)' }}>
-                  {ui.loginToSendRequest}
-                </Link>
-              )}
-
-              <p className="text-xs text-gray-400 text-center mt-3">{ui.freeToSend}</p>
             </div>
 
           </div>

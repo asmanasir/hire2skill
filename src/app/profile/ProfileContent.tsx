@@ -4,9 +4,11 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { List, LogOut, X } from 'lucide-react'
 import { FEATURES } from '@/lib/features'
 import { useLanguage } from '@/context/LanguageContext'
 import { formatDateByLocale } from '@/lib/i18n/date'
+import { geocodeAddressNorway } from '@/lib/geo/geocode-client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,8 @@ type Profile = {
   languages: string[] | null
   brings_tools: boolean | null
   can_invoice: boolean | null
+  latitude?: number | null
+  longitude?: number | null
 }
 
 type Post = {
@@ -139,7 +143,7 @@ const NORWAY_LOCATIONS = [
 ]
 
 const DEFAULT_NOTIF: Record<string, boolean> = {
-  task_email: false, task_sms: true,   task_push: false,
+  task_email: true, task_sms: true, task_push: true,
   promo_email: true,  promo_sms: true,  promo_push: true,
 }
 
@@ -242,7 +246,7 @@ function TextInput({ value, onChange, placeholder, readOnly, type = 'text' }: {
   return (
     <input type={type} value={value} readOnly={readOnly}
       onChange={e => onChange?.(e.target.value)} placeholder={placeholder}
-      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
+      className={`w-full min-w-0 max-w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
         readOnly
           ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
           : 'border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
@@ -640,12 +644,14 @@ export default function ProfileContent({
   const [delOtp,       setDelOtp]       = useState('')
   const [delBusy,      setDelBusy]      = useState(false)
   const [delErr,       setDelErr]       = useState('')
+  const [mobileSectionMenuOpen, setMobileSectionMenuOpen] = useState(false)
 
   // ── Derived
   const initials = (init?.display_name ?? user.email)
     .split(' ').slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('') ||
     user.email[0]?.toUpperCase()
   const avatarColor = AVATAR_COLORS[user.id.charCodeAt(user.id.length - 1) % AVATAR_COLORS.length]
+  const currentTabLabel = tabs.find((x) => x.key === tab)?.label ?? ''
   const isProfDirty = useMemo(() => {
     return (
       role !== ((init?.role as RoleType) ?? 'poster') ||
@@ -672,6 +678,20 @@ export default function ProfileContent({
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [])
+
+  useEffect(() => {
+    if (!mobileSectionMenuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMobileSectionMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [mobileSectionMenuOpen])
 
   useEffect(() => {
     if (tab !== 'cancel' || posts.length === 0) return
@@ -732,6 +752,17 @@ export default function ProfileContent({
   async function saveProfile() {
     setProfileErr('')
     setProfSaving(true)
+
+    let latitude: number | null = null
+    let longitude: number | null = null
+    if (role === 'helper' && location.trim()) {
+      const g = await geocodeAddressNorway(location.trim())
+      if (g) {
+        latitude = g.lat
+        longitude = g.lon
+      }
+    }
+
     const { error } = await createClient().from('profiles').upsert({
       id: user.id, role, display_name: name, bio, location,
       hourly_rate: rate ? Number(rate) : null, categories: cats, avatar_url: avatar,
@@ -739,6 +770,8 @@ export default function ProfileContent({
       languages: helperLanguages,
       brings_tools: bringsTools,
       can_invoice: canInvoice,
+      latitude,
+      longitude,
     })
     setProfSaving(false)
     if (error) {
@@ -836,20 +869,27 @@ export default function ProfileContent({
     router.push('/')
   }
 
+  async function handleSignOut() {
+    const sb = createClient()
+    await sb.auth.signOut()
+    router.replace('/login')
+    router.refresh()
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10">
-      <div className="mx-auto max-w-5xl px-6">
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-8">{t.profilePage.title}</h1>
+    <div className="min-h-screen bg-gray-50 py-6 sm:py-10">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 sm:mb-8">{t.profilePage.title}</h1>
 
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-stretch lg:items-start">
 
-          {/* ── Sidebar ── */}
-          <aside className="w-52 shrink-0">
-            <nav className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          {/* ── Sidebar (desktop) ── */}
+          <aside className="hidden lg:block w-full lg:w-52 shrink-0">
+            <nav className="bg-white rounded-2xl border border-gray-200 overflow-visible">
               {tabs.map((tabItem, i) => (
-                <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+                <button key={tabItem.key} type="button" onClick={() => setTab(tabItem.key)}
                   className={`relative block w-full text-left px-4 py-3 text-sm font-medium transition-all
                     ${i < tabs.length - 1 ? 'border-b border-gray-100' : ''}
                     ${tabItem.key === 'delete'
@@ -869,8 +909,29 @@ export default function ProfileContent({
             </nav>
           </aside>
 
-          {/* ── Content panel ── */}
-          <main className="flex-1 bg-white rounded-2xl border border-gray-200 p-8 min-h-135">
+          <div className="flex flex-1 min-w-0 flex-col gap-3 lg:contents">
+            {/* Mobile: current section + open list from the right (not a tall in-page column) */}
+            <div className="lg:hidden shrink-0">
+              <button
+                type="button"
+                onClick={() => setMobileSectionMenuOpen(true)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm active:bg-gray-50"
+                aria-expanded={mobileSectionMenuOpen}
+                aria-haspopup="dialog"
+                aria-label={t.profilePage.sectionMenuOpen}
+              >
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    {t.profilePage.sectionMenuTitle}
+                  </span>
+                  <span className="block truncate text-sm font-bold text-gray-900">{currentTabLabel}</span>
+                </span>
+                <List className="h-5 w-5 shrink-0 text-blue-600" strokeWidth={2} aria-hidden />
+              </button>
+            </div>
+
+            {/* ── Content panel ── */}
+            <main className="flex-1 min-w-0 w-full bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 lg:p-8 min-h-135">
 
             {/* ─── PROFILE ─── */}
             {tab === 'profile' && (
@@ -878,7 +939,7 @@ export default function ProfileContent({
                 <SectionTitle title="Profile" sub="Update your personal information and how you appear to others." />
 
                 {/* Avatar row */}
-                <div className="flex items-center gap-5 mb-8">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 mb-8">
                   <div className="relative">
                     {avatar
                       ? <Image src={avatar} alt="avatar" width={80} height={80} className="h-20 w-20 rounded-full object-cover ring-2 ring-white shadow-md" />
@@ -916,9 +977,9 @@ export default function ProfileContent({
                 )}
 
                 {/* Role switcher */}
-                <div className="mb-6">
+                <div className="mb-6 min-w-0">
                   <FieldLabel>Account type</FieldLabel>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
+                  <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 mt-1">
                     {([
                       { key: 'poster', label: 'Task Poster', sub: 'I need help',
                         icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/><path d="M9 10h6"/></svg>,
@@ -928,7 +989,7 @@ export default function ProfileContent({
                         active: 'border-green-500 bg-green-50 text-green-700', iconBg: 'bg-green-100 text-green-600' },
                     ] as const).map(opt => (
                       <button key={opt.key} type="button" onClick={() => setRole(opt.key as RoleType)}
-                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                        className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left min-w-0 w-full ${
                           role === opt.key ? opt.active : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                         }`}>
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
@@ -936,8 +997,8 @@ export default function ProfileContent({
                         }`}>
                           {opt.icon}
                         </div>
-                        <div>
-                          <p className="text-sm font-bold">{opt.label}</p>
+                        <div className="min-w-0 text-left">
+                          <p className="text-sm font-bold truncate">{opt.label}</p>
                           <p className="text-xs opacity-60">{opt.sub}</p>
                         </div>
                       </button>
@@ -1486,8 +1547,74 @@ export default function ProfileContent({
             )}
 
           </main>
+          </div>
+        </div>
+
+        <div className="lg:hidden mt-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+          >
+            <LogOut className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+            {t.nav.logout ?? 'Log out'}
+          </button>
         </div>
       </div>
+
+      {/* Mobile: section list slides in from the right */}
+      {mobileSectionMenuOpen ? (
+        <div className="lg:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-labelledby="profile-section-menu-title">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label={t.profilePage.sectionMenuClose}
+            onClick={() => setMobileSectionMenuOpen(false)}
+          />
+          <div className="absolute top-0 right-0 flex h-full w-[min(20rem,90vw)] flex-col border-l border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3 safe-area-inset-top">
+              <h2 id="profile-section-menu-title" className="text-sm font-extrabold text-gray-900">
+                {t.profilePage.sectionMenuTitle}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setMobileSectionMenuOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                aria-label={t.profilePage.sectionMenuClose}
+              >
+                <X className="h-5 w-5" strokeWidth={2} />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto overscroll-contain">
+              {tabs.map((tabItem, i) => (
+                <button
+                  key={tabItem.key}
+                  type="button"
+                  onClick={() => {
+                    setTab(tabItem.key)
+                    setMobileSectionMenuOpen(false)
+                  }}
+                  className={`relative block w-full text-left px-4 py-3.5 text-sm font-medium transition-colors
+                    ${i < tabs.length - 1 ? 'border-b border-gray-100' : ''}
+                    ${tabItem.key === 'delete'
+                      ? tab === tabItem.key
+                        ? 'text-red-600 font-bold bg-red-50'
+                        : 'text-red-500 hover:bg-red-50'
+                      : tab === tabItem.key
+                        ? 'text-blue-600 font-bold bg-blue-50'
+                        : 'text-gray-600 hover:bg-gray-50 active:bg-gray-100'
+                    }`}
+                >
+                  {tab === tabItem.key && (
+                    <span className={`absolute left-0 top-0 bottom-0 w-1 rounded-r ${tabItem.key === 'delete' ? 'bg-red-500' : 'bg-blue-600'}`} />
+                  )}
+                  {tabItem.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Delete Account Modal ──────────────────────────────────────────────── */}
       {showDelete && (

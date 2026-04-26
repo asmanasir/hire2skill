@@ -1,14 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
-  const [done, setDone] = useState(false)
   const [error, setError] = useState('')
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [sessionMissing, setSessionMissing] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!cancelled) {
+        setSessionMissing(!session)
+        setSessionChecked(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -25,42 +42,55 @@ export default function ResetPasswordPage() {
 
     setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.updateUser({ password })
-    setLoading(false)
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setDone(true)
+    const { error: updateErr } = await supabase.auth.updateUser({ password })
+    if (updateErr) {
+      setLoading(false)
+      setError(updateErr.message)
+      return
     }
+
+    await supabase.auth.signOut()
+    window.location.assign('/login?reset=success')
+  }
+
+  if (!sessionChecked) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-gray-50 px-4 py-10">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center text-sm text-gray-500">
+          Loading…
+        </div>
+      </div>
+    )
+  }
+
+  if (sessionMissing) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-gray-50 px-4 py-10">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+          <h1 className="text-xl font-extrabold text-gray-900 mb-2">Reset link required</h1>
+          <p className="text-sm text-gray-600 mb-4">
+            This page works after you open the password-reset link from your email. If you came here directly,
+            request a new link — it also fixes expired links.
+          </p>
+          <Link
+            href="/forgot-password"
+            className="block w-full rounded-xl py-3 text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
+            style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}
+          >
+            Request reset link
+          </Link>
+          <Link href="/login" className="mt-3 block text-center text-sm font-semibold text-blue-600 hover:underline">
+            Back to log in
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="flex flex-1 items-center justify-center bg-gray-50 px-4 py-10">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-
-        {done ? (
-          /* ── Success state ── */
-          <div className="text-center">
-            <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-5"
-              style={{ background: 'linear-gradient(135deg,#F0FDF4,#BBF7D0)' }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <h2 className="text-xl font-extrabold text-gray-900 mb-2">Password updated!</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Your password has been changed successfully. You can now log in with your new password.
-            </p>
-            <a href="/login"
-              className="block w-full rounded-xl py-3 text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
-              Go to login →
-            </a>
-          </div>
-        ) : (
-          /* ── Form state ── */
-          <>
+        <>
             <div className="mb-6">
               <div className="h-12 w-12 rounded-2xl flex items-center justify-center mb-4"
                 style={{ background: 'linear-gradient(135deg,#EFF6FF,#BFDBFE)' }}>
@@ -127,8 +157,7 @@ export default function ResetPasswordPage() {
                 {loading ? 'Updating...' : 'Update password'}
               </button>
             </form>
-          </>
-        )}
+        </>
       </div>
     </div>
   )

@@ -39,10 +39,12 @@ export function LogoIcon({ size = 40 }: { size?: number }) {
 
 export function LogoHorizontal() {
   return (
-    <span className="flex items-center gap-3">
-      <LogoIcon size={46} />
+    <span className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <span className="shrink-0 scale-[0.85] sm:scale-100 origin-left">
+        <LogoIcon size={46} />
+      </span>
       <span
-        className="text-xl font-extrabold tracking-tight"
+        className="hidden min-w-0 truncate text-base font-extrabold tracking-tight sm:block sm:text-xl"
         style={{
           lineHeight: 1,
         }}

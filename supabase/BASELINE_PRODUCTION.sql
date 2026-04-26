@@ -82,11 +82,15 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS avg_rating numeric(3,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS review_count int DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS latitude double precision,
+  ADD COLUMN IF NOT EXISTS longitude double precision;
 
 COMMENT ON COLUMN public.profiles.languages IS 'Languages helper can use with clients, e.g. no,en';
 COMMENT ON COLUMN public.profiles.brings_tools IS 'Whether helper brings own tools/equipment';
 COMMENT ON COLUMN public.profiles.can_invoice IS 'Whether helper can invoice (typically VAT/business)';
+COMMENT ON COLUMN public.profiles.latitude IS 'WGS84 latitude; set when location is geocoded (Norway)';
+COMMENT ON COLUMN public.profiles.longitude IS 'WGS84 longitude; set when location is geocoded (Norway)';
 
 -- RLS for profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -334,6 +338,31 @@ DROP TRIGGER IF EXISTS trg_notify_new_message ON public.messages;
 DROP FUNCTION IF EXISTS public.trg_notify_new_booking();
 DROP FUNCTION IF EXISTS public.trg_notify_booking_accepted();
 DROP FUNCTION IF EXISTS public.trg_notify_new_message();
+
+-- Login UX: check if auth.users has this email (service_role RPC only)
+CREATE OR REPLACE FUNCTION public.auth_email_exists(p_email text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM auth.users u
+    WHERE u.email IS NOT NULL
+      AND lower(trim(u.email)) = lower(trim(p_email))
+    UNION
+    SELECT 1
+    FROM auth.identities i
+    WHERE i.identity_data IS NOT NULL
+      AND nullif(trim(i.identity_data->>'email'), '') IS NOT NULL
+      AND lower(trim(i.identity_data->>'email')) = lower(trim(p_email))
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.auth_email_exists(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.auth_email_exists(text) TO service_role;
 
 COMMIT;
 

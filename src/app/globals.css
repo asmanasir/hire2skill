@@ -142,3 +142,12 @@ html.dark .hover\:border-blue-300:hover { border-color: #3B82F6 !important; }
   justify-content: center;
 }
 .btn-accent:hover { background: #D97706; }
+
+/* Leaflet (helpers map): remove default frame on custom cluster divIcon */
+.leaflet-container {
+  font-family: inherit;
+}
+.tasker-map-cluster-marker {
+  background: transparent !important;
+  border: none !important;
+}

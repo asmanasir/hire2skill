@@ -24,7 +24,7 @@ export default async function MobileBottomNav() {
     } catch {}
   }
 
-  const homeHref = user ? '/dashboard' : '/'
+  const homeHref = '/'
   const msgHref  = user ? '/chat'      : '/login'
   const profHref = user ? '/profile'   : '/login'
 
@@ -35,7 +35,7 @@ export default async function MobileBottomNav() {
       <Link href={homeHref} className="flex-1 flex flex-col items-center justify-center gap-0.5
                                         text-gray-400 hover:text-blue-600 transition-colors active:scale-95">
         <Home size={22} strokeWidth={1.8} />
-        <span className="text-[10px] font-medium">{user ? 'Dashboard' : 'Home'}</span>
+        <span className="text-[10px] font-medium">Home</span>
       </Link>
 
       <Link href="/taskers" className="flex-1 flex flex-col items-center justify-center gap-0.5

@@ -4,6 +4,7 @@ import React from 'react'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { geocodeAddressNorway } from '@/lib/geo/geocode-client'
 import { useLanguage } from '@/context/LanguageContext'
 import {
   SprayCan, Truck, GraduationCap, Package, Wrench, PartyPopper, Monitor, Leaf,
@@ -213,12 +214,21 @@ export default function OnboardingForm({ userId, userEmail }: { userId: string; 
       return
     }
     setFieldErrors({})
+    let latitude: number | null = null
+    let longitude: number | null = null
+    const g = await geocodeAddressNorway(location.trim())
+    if (g) {
+      latitude = g.lat
+      longitude = g.lon
+    }
     const ok = await saveProfile('helper', {
       bio: bio.trim(),
       hourly_rate: hourlyRate ? Number(hourlyRate) : null,
       categories,
       location: location.trim(),
       video_intro_url: videoIntroUrl.trim() || null,
+      latitude,
+      longitude,
     })
     if (ok) setStep(3)
   }
@@ -510,10 +520,10 @@ export default function OnboardingForm({ userId, userEmail }: { userId: string; 
 
               {/* Action buttons */}
               <div className="flex flex-col gap-3">
-                <Link href="/dashboard"
+                <Link href="/"
                   className="block w-full rounded-xl py-3.5 text-sm font-bold text-white text-center transition-opacity hover:opacity-90"
                   style={{ background: 'linear-gradient(90deg,#2563EB,#38BDF8)' }}>
-                  {role === 'helper' ? 'Go to my dashboard →' : 'Browse helpers →'}
+                  {o.startExploring}
                 </Link>
                 {role === 'poster' && (
                   <Link href="/post"

@@ -8,13 +8,13 @@ export const metadata = {
 export default function ServicesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero */}
+      {/* Hero — compact; subtitle kept for screen readers / SEO */}
       <div className="bg-white border-b border-gray-100">
-        <div className="mx-auto max-w-6xl px-6 py-14 text-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-3 pb-0 sm:pt-4 sm:pb-1 text-center">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
             What do you need help with?
           </h1>
-          <p className="text-lg text-gray-500 max-w-xl mx-auto">
+          <p className="sr-only">
             Verified local helpers across Norway — ready for any task, big or small.
           </p>
         </div>

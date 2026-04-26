@@ -5,6 +5,12 @@ import webpush from 'web-push'
 import { getClientIp, isRateLimited, sanitizeHtml } from '@/lib/api-security'
 import { SERVER_ENV, getSupabaseServiceEnv } from '@/lib/env/server'
 import { logServerEvent } from '@/lib/telemetry'
+import {
+  pushBookingAccepted,
+  pushBookingDeclined,
+  pushNewBooking,
+  pushNewMessage,
+} from '@/lib/notify/push-copy-no'
 
 const RESEND_API_KEY = SERVER_ENV.RESEND_API_KEY
 const APP_URL =
@@ -18,6 +24,29 @@ function configurePush() {
   if (!publicKey || !privateKey) return false
   webpush.setVapidDetails('mailto:support@hire2skill.com', publicKey, privateKey)
   return true
+}
+
+type NotifyChannels = { email: boolean; push: boolean }
+
+/** Respect profile toggles; null/missing profile JSON defaults to both channels on (legacy). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadNotifyChannels(admin: any, userId: string): Promise<NotifyChannels> {
+  const { data } = await admin.from('profiles').select('notifications').eq('id', userId).single()
+  const raw = data?.notifications
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { email: true, push: true }
+  }
+  const n = raw as Record<string, unknown>
+  return {
+    email: n.task_email !== false,
+    push: n.task_push !== false,
+  }
+}
+
+/** Web push opens the in-app notifications screen; optional ?next= deep link. */
+function pushLandingUrl(relatedPath: string): string {
+  const path = relatedPath.startsWith('/') ? relatedPath : `/${relatedPath}`
+  return `/notifications?next=${encodeURIComponent(path)}`
 }
 
 type PushSub = { endpoint: string; p256dh: string; auth: string }
@@ -151,8 +180,9 @@ export async function POST(req: NextRequest) {
       const helperEmail = helperAuth?.user?.email
       const posterName = sanitizeHtml(poster?.display_name ?? 'Someone')
       const subject = `New task request from ${posterName}`
+      const channels = await loadNotifyChannels(supabase, booking.helper_id)
       const tasks: Promise<unknown>[] = []
-      if (helperEmail && APP_URL) {
+      if (helperEmail && APP_URL && channels.email) {
         tasks.push(sendEmail(helperEmail, subject, layout(`
           <p style="margin:0 0 16px;">
             <strong>${posterName}</strong> has sent you a booking request on Hire2Skill.
@@ -161,11 +191,11 @@ export async function POST(req: NextRequest) {
           ${btn('View Request', `${APP_URL}/dashboard`)}
         `)))
       }
-      if (configurePush()) {
+      if (configurePush() && channels.push) {
         tasks.push(sendPush(booking.helper_id, supabase, {
           title: `New request from ${posterName}`,
           body: 'Tap to view and accept the booking.',
-          url: '/dashboard',
+          url: pushLandingUrl('/dashboard'),
         }))
       }
       await Promise.all(tasks)
@@ -191,9 +221,11 @@ export async function POST(req: NextRequest) {
       ])
       const posterEmail = posterAuth?.user?.email
       const helperName = sanitizeHtml(helper?.display_name ?? 'Your helper')
+      const pushHelper = helper?.display_name?.trim() || 'Hjelperen'
       const subject = `${helperName} accepted your request!`
+      const channels = await loadNotifyChannels(supabase, booking.poster_id)
       const tasks: Promise<unknown>[] = []
-      if (posterEmail && APP_URL) {
+      if (posterEmail && APP_URL && channels.email) {
         tasks.push(sendEmail(posterEmail, subject, layout(`
           <p style="margin:0 0 16px;">
             <strong>${helperName}</strong> accepted your booking request on Hire2Skill.
@@ -202,11 +234,12 @@ export async function POST(req: NextRequest) {
           ${btn('Open Chat', `${APP_URL}/chat/${booking.id}`)}
         `)))
       }
-      if (configurePush()) {
+      if (configurePush() && channels.push) {
+        const p = pushBookingAccepted(pushHelper)
         tasks.push(sendPush(booking.poster_id, supabase, {
-          title: `${helperName} accepted your booking!`,
-          body: 'Tap to open the chat.',
-          url: `/chat/${booking.id}`,
+          title: p.title,
+          body: p.body,
+          url: pushLandingUrl(`/chat/${booking.id}`),
         }))
       }
       await Promise.all(tasks)
@@ -232,9 +265,11 @@ export async function POST(req: NextRequest) {
       ])
       const posterEmail = posterAuth?.user?.email
       const helperName = sanitizeHtml(helper?.display_name ?? 'Your helper')
+      const pushHelper = helper?.display_name?.trim() || 'Hjelperen'
       const subject = `${helperName} declined your request`
+      const channels = await loadNotifyChannels(supabase, booking.poster_id)
       const tasks: Promise<unknown>[] = []
-      if (posterEmail && APP_URL) {
+      if (posterEmail && APP_URL && channels.email) {
         tasks.push(sendEmail(posterEmail, subject, layout(`
           <p style="margin:0 0 16px;">
             <strong>${helperName}</strong> declined your booking request on Hire2Skill.
@@ -243,11 +278,12 @@ export async function POST(req: NextRequest) {
           ${btn('Find Helpers', `${APP_URL}/taskers`)}
         `)))
       }
-      if (configurePush()) {
+      if (configurePush() && channels.push) {
+        const p = pushBookingDeclined(pushHelper)
         tasks.push(sendPush(booking.poster_id, supabase, {
-          title: `${helperName} declined your request`,
-          body: 'Browse helpers to send a new request.',
-          url: '/taskers',
+          title: p.title,
+          body: p.body,
+          url: pushLandingUrl('/taskers'),
         }))
       }
       await Promise.all(tasks)
@@ -270,10 +306,12 @@ export async function POST(req: NextRequest) {
       ])
       const recipientEmail = recipientAuth?.user?.email
       const senderName = sanitizeHtml(sender?.display_name ?? 'Someone')
+      const pushSender = sender?.display_name?.trim() || 'Noen'
       const safePreview = sanitizeHtml(preview).slice(0, 120)
       const subject = `New message from ${senderName}`
+      const channels = await loadNotifyChannels(supabase, recipientId)
       const tasks: Promise<unknown>[] = []
-      if (recipientEmail && APP_URL) {
+      if (recipientEmail && APP_URL && channels.email) {
         tasks.push(sendEmail(recipientEmail, subject, layout(`
           <p style="margin:0 0 8px;">You have a new message from <strong>${senderName}</strong>.</p>
           ${safePreview ? `<blockquote style="margin:16px 0;padding:12px 16px;background:#f4f4f5;
@@ -282,11 +320,12 @@ export async function POST(req: NextRequest) {
           ${btn('Reply', `${APP_URL}/chat/${msgBookingId}`)}
         `)))
       }
-      if (configurePush()) {
+      if (configurePush() && channels.push) {
+        const p = pushNewMessage(pushSender, preview.slice(0, 120))
         tasks.push(sendPush(recipientId, supabase, {
-          title: `${senderName} sent you a message`,
-          body: safePreview ? safePreview.slice(0, 100) : 'Tap to reply.',
-          url: `/chat/${msgBookingId}`,
+          title: p.title,
+          body: p.body,
+          url: pushLandingUrl(`/chat/${msgBookingId}`),
         }))
       }
       await Promise.all(tasks)

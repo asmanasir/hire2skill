@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { type NextRequest, NextResponse } from 'next/server'
+import { getPublicSupabaseEnv } from '@/lib/env/public'
 
 function resolveNextPath(raw: string | null): string | null {
   if (!raw) return null
@@ -8,37 +9,69 @@ function resolveNextPath(raw: string | null): string | null {
   return raw
 }
 
-export async function GET(request: Request) {
+function copyCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach(({ name, value }) => {
+    to.cookies.set(name, value)
+  })
+}
+
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const type = searchParams.get('type')
   const nextPath = resolveNextPath(searchParams.get('next'))
+  const { url, anonKey } = getPublicSupabaseEnv()
 
-  if (code) {
-    const supabase = await createClient()
-    const { data } = await supabase.auth.exchangeCodeForSession(code)
-
+  if (!code) {
     if (type === 'recovery') {
       return NextResponse.redirect(`${origin}/reset-password`)
     }
+    return NextResponse.redirect(`${origin}/onboarding`)
+  }
 
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', data.user.id)
-        .maybeSingle()
+  let redirectUrl =
+    type === 'recovery'
+      ? `${origin}/reset-password`
+      : `${origin}/onboarding`
 
-      if (profile && nextPath) {
-        return NextResponse.redirect(`${origin}${nextPath}`)
-      }
-      return NextResponse.redirect(`${origin}${profile ? '/dashboard' : '/onboarding'}`)
-    }
+  let response = NextResponse.redirect(redirectUrl)
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        response = NextResponse.redirect(redirectUrl)
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options)
+        })
+      },
+    },
+  })
+
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (error || !data.session) {
+    return NextResponse.redirect(`${origin}/login?error=auth`)
   }
 
   if (type === 'recovery') {
-    return NextResponse.redirect(`${origin}/reset-password`)
+    return response
   }
 
-  return NextResponse.redirect(`${origin}/onboarding`)
+  if (!data.user) {
+    return NextResponse.redirect(`${origin}/login?error=auth`)
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', data.user.id)
+    .maybeSingle()
+
+  const path = profile && nextPath ? nextPath : profile ? '/' : '/onboarding'
+  const out = NextResponse.redirect(`${origin}${path}`)
+  copyCookies(response, out)
+  return out
 }

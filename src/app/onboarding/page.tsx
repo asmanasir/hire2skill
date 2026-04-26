@@ -14,7 +14,7 @@ export default async function OnboardingPage() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role) redirect('/dashboard')
+  if (profile?.role) redirect('/')
 
   return <OnboardingForm userId={user.id} userEmail={user.email ?? ''} />
 }

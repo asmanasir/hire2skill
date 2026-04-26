@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useLanguage } from '@/context/LanguageContext'
-import { CheckCircle2, Clock3, CreditCard, MapPin, MessageCircle, Search, ShieldCheck, Users, X, Zap } from 'lucide-react'
+import { CheckCircle2, Clock3, MapPin, MessageCircle, Search, Users, X, Zap } from 'lucide-react'
 import { CATEGORY_BY_KEY, CATEGORY_KEYS, CATEGORY_LABEL_BY_KEY, toCategoryKey } from '@/lib/categories'
 import { categoryIconProps } from '@/lib/category-icon'
 import IconBadge from '@/components/IconBadge'
@@ -267,7 +267,7 @@ export default function HomeContent({
       title: how1.title,
       desc: how1.desc,
       icon: (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
         </svg>
       ),
@@ -279,7 +279,7 @@ export default function HomeContent({
       title: how2.title,
       desc: how2.desc,
       icon: (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       ),
@@ -291,159 +291,108 @@ export default function HomeContent({
       title: how3.title,
       desc: how3.desc,
       icon: (
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
       ),
     },
   ]
 
+  const categoryPh =
+    'categorySearchPlaceholder' in h && h.categorySearchPlaceholder
+      ? h.categorySearchPlaceholder
+      : 'Search categories…'
+  const browseAllLabel = 'browseAllHelpers' in h && h.browseAllHelpers ? h.browseAllHelpers : 'All helpers'
+
   return (
     <div className="flex flex-col bg-gray-50">
 
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="bg-white border-b border-gray-100 px-6 py-20 text-center">
+      {/* ── Compact hero + categories (mobile: minimal copy so filters sit high) ─ */}
+      <section className="bg-white border-b border-gray-100 px-4 pt-2 pb-3 sm:px-6 sm:pt-5 sm:pb-8 max-w-6xl mx-auto w-full text-center">
         <div className="mx-auto max-w-2xl">
-          {/* Norway badge — SVG flag, no emoji */}
-          <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 mb-6 border border-blue-100">
-            <NorwayFlag size={14} />
+          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 mb-2 border border-blue-100">
+            <NorwayFlag size={11} />
             {h.badge}
           </span>
-
-          <h1 className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight text-gray-900 mb-4">
-            {h.title1}{' '}
-            <span className="block" style={{ background: 'var(--sl-gradient-hero-text)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 className="text-lg sm:text-3xl md:text-4xl font-extrabold leading-snug tracking-tight text-gray-900 mb-0 sm:mb-1.5">
+            <span className="sm:hidden text-gray-900">{h.title1}</span>
+            <span className="hidden sm:inline">{h.title1}{' '}</span>
+            <span className="sm:whitespace-nowrap" style={{ background: 'var(--sl-gradient-hero-text)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {h.title2}
             </span>
           </h1>
+          {h.subtitle?.trim() ? (
+            <p className="hidden sm:block text-sm text-gray-500 max-w-lg mx-auto leading-snug">{h.subtitle}</p>
+          ) : null}
+        </div>
 
-          <p className="text-lg text-gray-500 mb-10 max-w-xl mx-auto leading-relaxed">{h.subtitle}</p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
-            <Link href="/post"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl px-9 py-5 text-lg font-extrabold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'var(--sl-gradient-primary)', boxShadow: 'var(--sl-shadow-primary)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              {h.cta1.replace('🚀 ', '')}
+        <div className="mx-auto max-w-3xl mt-2 sm:mt-5 mb-2 sm:mb-5">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-stretch">
+            <div className="relative flex-1 min-w-0">
+              <Search size={18} className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="search"
+                value={catSearch}
+                onChange={e => setCatSearch(e.target.value)}
+                placeholder={categoryPh}
+                autoComplete="off"
+                className="w-full min-w-0 rounded-xl sm:rounded-2xl border border-gray-200 bg-gray-50 pl-11 sm:pl-12 pr-9 sm:pr-10 py-2.5 sm:py-3.5 text-sm sm:text-base text-gray-900 shadow-sm
+                           focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 placeholder:text-gray-400"
+              />
+              {catSearch && (
+                <button type="button" onClick={() => setCatSearch('')}
+                  className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                  aria-label="Clear search">
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            <Link
+              href="/taskers"
+              className="inline-flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl border-2 border-gray-200 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-gray-700 whitespace-nowrap shrink-0 sm:px-5 sm:py-3.5
+                         hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-colors">
+              <Users size={16} className="text-blue-600 shrink-0 sm:h-[18px] sm:w-[18px]" strokeWidth={2} />
+              {browseAllLabel}
             </Link>
-            <Link href="/signup"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-gray-300 bg-white px-9 py-5 text-lg font-extrabold text-gray-700 transition hover:border-blue-400 hover:text-blue-600 hover:shadow-lg">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              {h.cta2.replace(' →', '')}
-            </Link>
-          </div>
-
-          {/* Social proof stats */}
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 mt-2">
-            {[
-              { num: '8,000+', label: 'tasks completed', color: '#16A34A', bg: '#F0FDF4' },
-              { num: '2,400+', label: 'verified helpers', color: '#2563EB', bg: '#EFF6FF' },
-              { num: '4.9★', label: 'average rating', color: '#D97706', bg: '#FFFBEB' },
-            ].map(s => (
-              <div key={s.label} className="flex items-center gap-2 rounded-full px-4 py-2 border"
-                style={{ background: s.bg, borderColor: s.bg }}>
-                <span className="text-base font-extrabold" style={{ color: s.color }}>{s.num}</span>
-                <span className="text-xs text-gray-500">{s.label}</span>
-              </div>
-            ))}
           </div>
         </div>
-      </section>
 
-      {/* ── SKILLLINK GUARANTEE BAND ─────────────────────────────────────── */}
-      <section className="bg-linear-to-r from-green-600 to-emerald-500 px-6 py-5">
-        <div className="mx-auto max-w-5xl">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12 text-white">
-            {[
-              { icon: <ShieldCheck size={20} strokeWidth={2.3} />, title: 'Hire2Skill Guarantee', desc: 'Not happy? We make it right.' },
-              { icon: <CreditCard size={20} strokeWidth={2.3} />, title: 'Secure Payments', desc: 'Pay safely through Hire2Skill.' },
-              { icon: <CheckCircle2 size={20} strokeWidth={2.3} />, title: 'Verified Helpers', desc: 'ID-checked locals you can trust.' },
-            ].map(item => (
-              <div key={item.title} className="flex items-center gap-3">
-                <IconBadge tone="frost" size="md" withBorder={false}>
-                  {item.icon}
-                </IconBadge>
-                <div>
-                  <p className="font-extrabold text-sm leading-tight">{item.title}</p>
-                  <p className="text-xs text-white/80">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SEASONAL SPOTLIGHT ───────────────────────────────────────────── */}
-      <section className="px-6 py-10 max-w-6xl mx-auto w-full">
-        <div className="rounded-3xl border border-blue-100 bg-white px-6 py-7 shadow-sm">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-blue-600 mb-2">{h.seasonalKicker}</p>
-          <h2 className="text-lg font-extrabold text-gray-900 mb-2">{seasonal.title}</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">{seasonal.body}</p>
-        </div>
-      </section>
-
-      {/* ── TRUST MICROCOPY ─────────────────────────────────────────────── */}
-      <section className="px-6 pb-6 max-w-6xl mx-auto w-full">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <p className="text-xs text-gray-500 leading-relaxed bg-white border border-gray-200 rounded-2xl px-4 py-3">
-            {h.trustPricingNote}
+        {/* Cities + group filters: above icon grid, sticky under nav while scrolling */}
+        <div
+          className="sticky top-14 z-40 -mx-4 border-y border-gray-200 bg-white/95 px-4 py-2 sm:py-3 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:-mx-6 sm:top-16 sm:px-6 supports-[backdrop-filter]:bg-white/90">
+          <p className="text-[11px] sm:text-xs text-gray-500 text-center sm:text-left mb-1.5 sm:mb-2 leading-snug">
+            <span className="font-semibold text-gray-600">Popular areas:</span>{' '}
+            <Link href="/cities/oslo" className="hover:text-blue-600 hover:underline">Oslo</Link>
+            <span className="mx-1">·</span>
+            <Link href="/cities/bergen" className="hover:text-blue-600 hover:underline">Bergen</Link>
+            <span className="mx-1">·</span>
+            <Link href="/cities/trondheim" className="hover:text-blue-600 hover:underline">Trondheim</Link>
+            <span className="mx-1">·</span>
+            <Link href="/taskers" className="hover:text-blue-600 hover:underline">Stavanger</Link>
           </p>
-          <p className="text-xs text-gray-500 leading-relaxed bg-white border border-gray-200 rounded-2xl px-4 py-3">
-            {h.trustVerifiedNote}
-          </p>
-        </div>
-      </section>
-
-      {/* ── CATEGORY BROWSE ───────────────────────────────────────────────── */}
-      <section className="px-6 py-14 max-w-6xl mx-auto w-full">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
-          <div>
-            <h2 className="text-xl font-extrabold text-gray-900 mb-1">{h.categoriesTitle}</h2>
-            <p className="text-sm text-gray-400">Oslo · Bergen · Trondheim · Stavanger</p>
-          </div>
-          {/* Search */}
-          <div className="relative w-full sm:w-72">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={catSearch}
-              onChange={e => setCatSearch(e.target.value)}
-              placeholder="Search categories…"
-              className="w-full rounded-2xl border border-gray-200 bg-white pl-9 pr-8 py-2.5 text-sm text-gray-900
-                         focus:outline-none focus:border-blue-400 shadow-sm placeholder:text-gray-400"
-            />
-            {catSearch && (
-              <button onClick={() => setCatSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={14} />
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center sm:justify-start">
+            {CAT_FILTER_GROUPS.map(g => (
+              <button key={g.label} type="button" onClick={() => setCatFilter(g.label)}
+                className="rounded-full px-3 py-1 text-xs sm:px-4 sm:py-1.5 sm:text-sm font-semibold transition-colors border"
+                style={catFilter === g.label
+                  ? { background: 'var(--sl-gradient-brand)', color: '#fff', borderColor: 'transparent' }
+                  : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
+                {g.label}
               </button>
-            )}
+            ))}
           </div>
-        </div>
-
-        {/* Filter chips */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {CAT_FILTER_GROUPS.map(g => (
-            <button key={g.label} onClick={() => setCatFilter(g.label)}
-              className="rounded-full px-4 py-1.5 text-sm font-semibold transition-colors border"
-              style={catFilter === g.label
-                ? { background: 'var(--sl-gradient-brand)', color: '#fff', borderColor: 'transparent' }
-                : { background: '#fff', color: '#4B5563', borderColor: '#E5E7EB' }}>
-              {g.label}
-            </button>
-          ))}
         </div>
 
         {catKeys.length === 0 ? (
-          <div className="text-center py-10">
+          <div className="text-center py-8 mt-3">
             <p className="text-gray-400 text-sm">No categories match &quot;{catSearch}&quot;</p>
-            <button onClick={() => { setCatSearch(''); setCatFilter('All') }}
+            <button type="button" onClick={() => { setCatSearch(''); setCatFilter('All') }}
               className="mt-3 text-sm font-semibold text-blue-600 hover:underline">
               Show all
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2 sm:gap-3 mt-2 sm:mt-3">
             {catKeys.map(key => {
               const cfg = CATEGORY_BY_KEY[key]
               if (!cfg) return null
@@ -451,11 +400,11 @@ export default function HomeContent({
               const label = CATEGORY_LABEL_BY_KEY[key] ?? (key.charAt(0).toUpperCase() + key.slice(1))
               return (
                 <Link key={key} href={`/taskers?category=${encodeURIComponent(label)}`}
-                  className="group flex flex-col items-center gap-2.5 rounded-2xl bg-white border border-gray-200 px-3 py-4 hover:border-blue-400 hover:shadow-lg transition-all duration-200 text-center">
+                  className="group flex flex-col items-center gap-1.5 rounded-lg sm:rounded-2xl bg-gray-50/80 border border-gray-200 px-1.5 py-2.5 sm:px-3 sm:py-4 sm:gap-2 hover:border-blue-400 hover:bg-white hover:shadow-md transition-all duration-200 text-center min-w-0">
                   <IconBadge size="lg" className="shadow-sm" style={{ background: cfg.bg }} withBorder={false}>
-                    <CatIcon {...categoryIconProps(24, cfg.color)} />
+                    <CatIcon {...categoryIconProps(22, cfg.color)} />
                   </IconBadge>
-                  <span className="text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors leading-tight">
+                  <span className="text-[11px] sm:text-xs font-bold text-gray-800 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
                     {label}
                   </span>
                 </Link>
@@ -463,160 +412,190 @@ export default function HomeContent({
             })}
           </div>
         )}
+
+        {/* Helpers & jobs first (Finn-style: listings right after categories) */}
+        <div className="mt-5 pt-5 border-t border-gray-100 w-full text-left">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-extrabold text-gray-900">Top helpers near you</h2>
+              <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Verified · Rated · Ready to help</p>
+            </div>
+            <Link href="/taskers" className="shrink-0 text-xs sm:text-sm font-semibold text-blue-600 hover:underline">
+              {h.seeAll}
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+            {displayHelpers.map((tasker, i) => (
+              <TaskerCard key={i} tasker={tasker} bookLabel={h.bookNow} replyLabel={h.replyTime} doneLabel={h.tasksDone} />
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 mt-8 mb-4">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <IconBadge tone="orange" size="sm" withBorder={false}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              </IconBadge>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">{h.urgentTitle}</h2>
+                <p className="text-xs sm:text-sm text-gray-400 truncate sm:whitespace-normal">{h.urgentSub}</p>
+              </div>
+            </div>
+            <Link href="/jobs" className="shrink-0 text-xs sm:text-sm font-semibold text-blue-600 hover:underline">
+              {h.seeAll}
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+            {jobs.slice(0, 3).map((job, i) => (
+              <TaskCard key={i} job={job} bookLabel={h.bookNow} negotiableLabel={h.negotiable} />
+            ))}
+          </div>
+        </div>
+
+        {/* Quick actions + trust chips */}
+        <div className="mt-6 pt-5 border-t border-gray-100 max-w-3xl mx-auto">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch">
+            <Link href="/post"
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 sm:py-3.5 text-sm font-extrabold text-white transition-opacity hover:opacity-90"
+              style={{ background: 'var(--sl-gradient-primary)', boxShadow: 'var(--sl-shadow-primary)' }}>
+              <Zap size={18} strokeWidth={2.2} />
+              {h.cta1.replace('🚀 ', '')}
+            </Link>
+            <Link href="/signup"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-6 py-3 sm:py-3.5 text-sm font-extrabold text-gray-700 transition hover:border-blue-400 hover:text-blue-600">
+              <Users size={18} strokeWidth={2} />
+              {h.cta2.replace(' →', '')}
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-4 sm:mt-6">
+            {[
+              { num: '8,000+', label: 'tasks completed', color: '#16A34A', bg: '#F0FDF4' },
+              { num: '2,400+', label: 'verified helpers', color: '#2563EB', bg: '#EFF6FF' },
+              { num: '4.9★', label: 'average rating', color: '#D97706', bg: '#FFFBEB' },
+            ].map(s => (
+              <div key={s.label} className="flex items-center gap-2 rounded-full px-3 py-1.5 border text-left"
+                style={{ background: s.bg, borderColor: s.bg }}>
+                <span className="text-sm font-extrabold" style={{ color: s.color }}>{s.num}</span>
+                <span className="text-[11px] text-gray-600">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Seasonal + trust (single compact card) ─────────────────────── */}
+      <section className="px-4 sm:px-6 py-4 max-w-6xl mx-auto w-full">
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 sm:px-5 shadow-sm">
+          <h2 className="text-base font-extrabold text-gray-900 leading-tight">{seasonal.title}</h2>
+          <p className="text-sm text-gray-600 mt-1 leading-snug">{seasonal.body}</p>
+          <p className="text-[11px] text-gray-500 mt-3 pt-3 border-t border-gray-100 leading-snug">
+            {h.trustPricingNote}
+            <span className="hidden sm:inline"> · </span>
+            <br className="sm:hidden" />
+            {h.trustVerifiedNote}
+          </p>
+        </div>
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
-      <section className="bg-white border-y border-gray-100 px-6 py-16">
+      <section className="bg-white border-y border-gray-100 px-4 sm:px-6 py-8 sm:py-10">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-2xl font-extrabold text-gray-900 text-center mb-12">{h.howTitle}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 text-center mb-6 sm:mb-8">{h.howTitle}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4">
             {HOW_STEPS.map((step, idx) => (
               <div key={idx} className="flex flex-col items-center text-center relative">
-                {/* Connector line */}
                 {idx < 2 && (
-                  <div className="hidden sm:block absolute top-8 left-[calc(50%+32px)] right-[-calc(50%-32px)] h-px" style={{ background: 'linear-gradient(90deg,#E5E7EB,#E5E7EB)', width: 'calc(100% - 32px)' }} />
+                  <div className="hidden sm:block absolute top-6 left-[calc(50%+24px)] right-[-calc(50%-24px)] h-px bg-gray-200 z-0" style={{ width: 'calc(100% - 24px)' }} />
                 )}
-                <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm relative z-10 border-2 border-white"
-                  style={{ background: step.bg, boxShadow: `0 0 0 4px ${step.bg}` }}>
+                <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-2 shadow-sm relative z-10 border-2 border-white"
+                  style={{ background: step.bg, boxShadow: `0 0 0 3px ${step.bg}` }}>
                   {step.icon}
                 </div>
-                <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-extrabold mb-3"
-                  style={{ background: step.bg, color: step.color }}>
-                  Step {step.num}
-                </span>
-                <h3 className="text-base font-extrabold text-gray-900 mb-2">{step.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{step.desc}</p>
+                <h3 className="text-sm font-extrabold text-gray-900 mb-0.5">{step.title}</h3>
+                <p className="text-xs text-gray-500 leading-snug max-w-[14rem] mx-auto">{step.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── HAPPINESS GUARANTEE ──────────────────────────────────────────── */}
-      <section className="px-6 py-12 max-w-5xl mx-auto w-full">
-        <div className="rounded-3xl border border-green-100 bg-green-50 px-8 py-10 flex flex-col sm:flex-row items-center gap-8">
-          <div className="h-20 w-20 rounded-2xl bg-green-100 flex items-center justify-center shrink-0 shadow-sm">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+      {/* ── Happiness guarantee (one compact row) ───────────────────────── */}
+      <section className="px-4 sm:px-6 py-3 max-w-5xl mx-auto w-full">
+        <div className="flex items-start gap-2.5 rounded-xl border border-green-100 bg-green-50/90 px-3 py-2.5 sm:items-center sm:gap-3">
+          <div className="h-9 w-9 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
           </div>
-          <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-xl font-extrabold text-gray-900 mb-2">The Hire2Skill Happiness Guarantee</h2>
-            <p className="text-sm text-gray-600 leading-relaxed max-w-xl">
-              Every task is covered. If you&apos;re not satisfied with the work, contact us within 72 hours and we&apos;ll help make it right — at no extra cost to you. Our helpers are vetted, rated, and held to a high standard.
-            </p>
-            <div className="flex flex-wrap gap-4 mt-5 justify-center sm:justify-start">
-              {['ID-verified helpers', 'Secure payments', 'Dispute resolution', '72h satisfaction window'].map(item => (
-                <span key={item} className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#15803D" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
+          <p className="text-[11px] sm:text-xs text-gray-700 leading-snug text-left">
+            <span className="font-bold text-gray-900">{h.guaranteeTitle}</span>
+            {' '}
+            {h.guaranteeBody}
+          </p>
         </div>
       </section>
 
-      {/* ── TOP TASKERS ──────────────────────────────────────────────────── */}
-      <section className="px-6 py-14 max-w-6xl mx-auto w-full">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-xl font-extrabold text-gray-900">Top helpers near you</h2>
-            <p className="text-sm text-gray-400 mt-1">Verified · Rated · Ready to help</p>
-          </div>
-          <Link href="/signup" className="text-sm font-semibold text-blue-600 hover:underline">{h.seeAll}</Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {displayHelpers.map((tasker, i) => (
-            <TaskerCard key={i} tasker={tasker} bookLabel={h.bookNow} replyLabel={h.replyTime} doneLabel={h.tasksDone} />
-          ))}
-        </div>
-      </section>
-
-      {/* ── URGENT TASKS ─────────────────────────────────────────────────── */}
-      <section className="px-6 pb-14 max-w-6xl mx-auto w-full">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <IconBadge tone="orange" size="sm" withBorder={false}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            </IconBadge>
-            <div>
-              <h2 className="text-lg font-extrabold text-gray-900">{h.urgentTitle}</h2>
-              <p className="text-sm text-gray-400">{h.urgentSub}</p>
-            </div>
-          </div>
-          <Link href="/signup" className="text-sm font-semibold text-blue-600 hover:underline">{h.seeAll}</Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {jobs.slice(0, 3).map((job, i) => (
-            <TaskCard key={i} job={job} bookLabel={h.bookNow} negotiableLabel={h.negotiable} />
-          ))}
-        </div>
-      </section>
-
-      {/* ── TRUST STATS BAND ─────────────────────────────────────────────── */}
-      <section className="bg-white border-y border-gray-100 px-6 py-14">
+      {/* ── Trust stats (compact) ────────────────────────────────────────── */}
+      <section className="bg-white border-y border-gray-100 px-3 sm:px-6 py-4 sm:py-5">
         <div className="mx-auto max-w-5xl">
-          <p className="text-center text-xs font-extrabold uppercase tracking-widest text-gray-400 mb-10">{h.trustTitle}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+          {h.trustTitle?.trim() ? (
+            <p className="text-center text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-3">{h.trustTitle}</p>
+          ) : null}
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
             {[
-              { val: '2,400+', label: 'Verified users', icon: <Users size={22} strokeWidth={2.2} color="#2563EB" />, tone: 'blue' as const },
-              { val: '< 2h', label: 'Avg. response', icon: <Clock3 size={22} strokeWidth={2.2} color="#7C3AED" />, tone: 'violet' as const },
-              { val: '8,000+', label: 'Tasks completed', icon: <CheckCircle2 size={22} strokeWidth={2.2} color="#16A34A" />, tone: 'green' as const },
-              { val: '12', label: 'Cities covered', icon: <MapPin size={22} strokeWidth={2.2} color="#EA580C" />, tone: 'orange' as const },
+              { val: '2,400+', label: h.trustStatUsers, icon: <Users size={16} strokeWidth={2.2} color="#2563EB" />, tone: 'blue' as const },
+              { val: '< 2h', label: h.trustStatResponse, icon: <Clock3 size={16} strokeWidth={2.2} color="#7C3AED" />, tone: 'violet' as const },
+              { val: '8,000+', label: h.trustStatTasks, icon: <CheckCircle2 size={16} strokeWidth={2.2} color="#16A34A" />, tone: 'green' as const },
+              { val: '12', label: h.trustStatCities, icon: <MapPin size={16} strokeWidth={2.2} color="#EA580C" />, tone: 'orange' as const },
             ].map(s => (
-              <div key={s.label} className="flex flex-col items-center text-center">
-                <IconBadge tone={s.tone} size="lg" className="mb-3" withBorder={false}>
+              <div key={s.label} className="flex flex-col items-center text-center min-w-0">
+                <IconBadge tone={s.tone} size="sm" className="mb-1 scale-90 sm:scale-100" withBorder={false}>
                   {s.icon}
                 </IconBadge>
-                <p className="text-2xl font-extrabold text-gray-900">{s.val}</p>
-                <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                <p className="text-sm sm:text-base font-extrabold text-gray-900 leading-none tabular-nums">{s.val}</p>
+                <p className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5 leading-tight px-0.5">{s.label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── WHY SKILLLINK ────────────────────────────────────────────────── */}
-      <section className="px-6 py-16 max-w-5xl mx-auto w-full">
-        <p className="text-center text-xs font-extrabold uppercase tracking-widest text-gray-400 mb-12">{h.whyTitle}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
+      {/* ── Why Hire2Skill (titles only, tight) ──────────────────────────── */}
+      <section className="px-4 sm:px-6 py-5 sm:py-6 max-w-5xl mx-auto w-full">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           {[
-            { tone: 'blue' as const, title: h.fast.title, desc: h.fast.desc,
-              icon: <Zap size={28} strokeWidth={2.2} color="#2563EB" /> },
-            { tone: 'green' as const, title: h.local.title, desc: h.local.desc,
-              icon: <MapPin size={28} strokeWidth={2.2} color="#16A34A" /> },
-            { tone: 'amber' as const, title: h.chat.title, desc: h.chat.desc,
-              icon: <MessageCircle size={28} strokeWidth={2.2} color="#D97706" /> },
+            { tone: 'blue' as const, title: h.fast.title, icon: <Zap size={20} strokeWidth={2.2} color="#2563EB" /> },
+            { tone: 'green' as const, title: h.local.title, icon: <MapPin size={20} strokeWidth={2.2} color="#16A34A" /> },
+            { tone: 'amber' as const, title: h.chat.title, icon: <MessageCircle size={20} strokeWidth={2.2} color="#D97706" /> },
           ].map(f => (
             <div key={f.title} className="flex flex-col items-center text-center">
-              <IconBadge tone={f.tone} size="xl" className="mb-5 shadow-sm" withBorder={false}>
+              <IconBadge tone={f.tone} size="sm" className="mb-1.5" withBorder={false}>
                 {f.icon}
               </IconBadge>
-              <h3 className="text-base font-extrabold text-gray-900 mb-2">{f.title}</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
+              <h3 className="text-[11px] sm:text-xs font-extrabold text-gray-900 leading-tight">{f.title}</h3>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
-      <section className="px-6 pb-16 max-w-5xl mx-auto w-full">
-        <div className="rounded-3xl px-8 py-16 text-center text-white relative overflow-hidden"
+      {/* ── Final CTA (compact) ───────────────────────────────────────────── */}
+      <section className="px-4 sm:px-6 pb-8 sm:pb-10 max-w-5xl mx-auto w-full">
+        <div className="rounded-2xl px-4 py-6 sm:px-6 sm:py-8 text-center text-white relative overflow-hidden"
           style={{ background: 'var(--sl-gradient-brand)' }}>
           <div className="absolute inset-0 opacity-10"
-            style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+            style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
           <div className="relative z-10">
-            <h2 className="text-3xl sm:text-4xl font-extrabold mb-3">{h.ctaTitle}</h2>
-            <p className="text-blue-100 mb-8 text-base max-w-md mx-auto">{h.ctaSub}</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <h2 className="text-lg sm:text-xl font-extrabold mb-1">{h.ctaTitle}</h2>
+            {h.ctaSub?.trim() ? (
+              <p className="text-blue-100/95 mb-4 text-xs sm:text-sm max-w-sm mx-auto leading-snug">{h.ctaSub}</p>
+            ) : null}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
               <Link href="/signup"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-extrabold transition hover:bg-blue-50 shadow-lg"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold transition hover:bg-blue-50 shadow-md"
                 style={{ color: '#1E3A8A' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 {h.ctaPrimary}
               </Link>
               <Link href="/post"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-white/50 px-8 py-4 text-base font-extrabold text-white transition hover:bg-white/10">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/60 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-white/10">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 {h.ctaSecondary}
               </Link>
             </div>

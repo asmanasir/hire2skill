@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+/** React dev tooling reconstructs stacks via eval(); production builds never need this. */
+const scriptSrc = isDev
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['172.28.16.1', '192.168.1.9'],
   poweredByHeader: false,
@@ -40,7 +46,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https:",
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
-              "script-src 'self' 'unsafe-inline'",
+              scriptSrc,
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co wss://*.supabase.net https://api.resend.com https://nominatim.openstreetmap.org https://api.mapbox.com https://www.google.com https://maps.apple.com",
               'upgrade-insecure-requests',
             ].join('; '),

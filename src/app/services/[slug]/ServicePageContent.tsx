@@ -250,7 +250,7 @@ function getServicesUi(locale: 'no' | 'en' | 'da' | 'sv') {
       relatedServices: 'Related services',
       readyToBook: (title: string) => `Ready to book ${title.toLowerCase()}?`,
       ctaHint: 'Post your task in 2 minutes and get matched with verified helpers near you.',
-      myDashboard: 'My Dashboard',
+      goHome: 'Home',
       createAccount: 'Create Account',
       priceEstimator: 'Price estimator',
       estimateHint: 'Get an instant cost estimate for your job',
@@ -289,7 +289,7 @@ function getServicesUi(locale: 'no' | 'en' | 'da' | 'sv') {
     relatedServices: 'Relaterte tjenester',
     readyToBook: (title: string) => `Klar for a booke ${title.toLowerCase()}?`,
     ctaHint: 'Legg ut oppdraget ditt pa 2 minutter og bli matchet med verifiserte hjelpere nar deg.',
-    myDashboard: 'Mitt dashboard',
+    goHome: 'Hjem',
     createAccount: 'Opprett konto',
     priceEstimator: 'Prisestimator',
     estimateHint: 'Fa et raskt prisestimat for oppdraget',
@@ -569,9 +569,9 @@ export default function ServicePageContent({
               style={{ color: BRAND_BLUE }}>
               {ui.postTask}
             </Link>
-            <Link href={isLoggedIn ? '/dashboard' : '/signup'}
+            <Link href={isLoggedIn ? '/' : '/signup'}
               className="rounded-xl px-7 py-3 font-bold text-sm border-2 border-white border-opacity-60 text-white hover:bg-white hover:bg-opacity-10 transition-colors">
-              {isLoggedIn ? ui.myDashboard : ui.createAccount}
+              {isLoggedIn ? ui.goHome : ui.createAccount}
             </Link>
           </div>
         </section>

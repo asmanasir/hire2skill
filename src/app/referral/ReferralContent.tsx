@@ -161,8 +161,8 @@ export default function ReferralContent({ userId, displayName }: { userId: strin
         </div>
 
         <div className="text-center">
-          <Link href="/dashboard" className="text-sm font-semibold text-blue-600 hover:underline">
-            ← Back to dashboard
+          <Link href="/" className="text-sm font-semibold text-blue-600 hover:underline">
+            ← Back to home
           </Link>
         </div>
       </div>

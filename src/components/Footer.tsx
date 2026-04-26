@@ -10,51 +10,60 @@ export default function Footer() {
 
   return (
     <footer className="bg-white border-t border-gray-200 mt-auto">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-8">
-          <div className="col-span-2 sm:col-span-1">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 sm:py-7">
+        {/* Mobile: 2 columns (shorter scroll); lg: 4 columns */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4 lg:gap-x-9 lg:gap-y-6 items-start text-[11px] sm:text-xs lg:text-sm">
+          {/* Brand — full width on mobile 2-col grid */}
+          <div className="col-span-2 lg:col-span-1 min-w-0">
             <LogoHorizontal />
-            <p className="mt-3 text-xs text-gray-400 leading-relaxed">
+            <p className="mt-2 text-[10px] sm:text-[11px] lg:text-xs text-gray-400 leading-snug max-w-sm">
               {f.tagline}
             </p>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{f.platform}</p>
-            <ul className="flex flex-col gap-2">
-              <li><Link href="/jobs" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.findJobs}</Link></li>
-              <li><Link href="/post" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.postJob}</Link></li>
-              <li><Link href="/signup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.createAccount}</Link></li>
-              <li className="pt-2 mt-1 border-t border-gray-100">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">{f.citiesHeading}</p>
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  <Link href="/cities/oslo" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">Oslo</Link>
-                  <Link href="/cities/bergen" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">Bergen</Link>
-                  <Link href="/cities/trondheim" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">Trondheim</Link>
-                </div>
-              </li>
+
+          {/* Platform */}
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{f.platform}</p>
+            <ul className="flex flex-col gap-1">
+              <li><Link href="/jobs" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.findJobs}</Link></li>
+              <li><Link href="/post" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.postJob}</Link></li>
+              <li><Link href="/signup" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.createAccount}</Link></li>
+            </ul>
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 mt-2 mb-0.5">{f.citiesHeading}</p>
+            <p className="text-gray-600 leading-snug text-[11px] sm:text-xs">
+              <Link href="/cities/oslo" className="hover:text-blue-600 transition-colors">Oslo</Link>
+              <span className="text-gray-300 mx-1">·</span>
+              <Link href="/cities/bergen" className="hover:text-blue-600 transition-colors">Bergen</Link>
+              <span className="text-gray-300 mx-1">·</span>
+              <Link href="/cities/trondheim" className="hover:text-blue-600 transition-colors">Trondheim</Link>
+            </p>
+          </div>
+
+          {/* Company */}
+          <div className="min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{f.company}</p>
+            <ul className="flex flex-col gap-1">
+              <li><Link href="/about" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.about}</Link></li>
+              <li><Link href="/contact" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.contact}</Link></li>
+              <li><Link href="/blog" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.blog}</Link></li>
             </ul>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{f.company}</p>
-            <ul className="flex flex-col gap-2">
-              <li><Link href="/about" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.about}</Link></li>
-              <li><Link href="/contact" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.contact}</Link></li>
-              <li><Link href="/blog" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.blog}</Link></li>
-            </ul>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{f.legal}</p>
-            <ul className="flex flex-col gap-2">
-              <li><Link href="/personvern" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.privacyLocal}</Link></li>
-              <li><Link href="/vilkar" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.termsLocal}</Link></li>
-              <li><Link href="/privacy" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.privacyEn}</Link></li>
-              <li><Link href="/terms" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">{f.termsEn}</Link></li>
+
+          {/* Legal — two columns of links on mobile; single column on lg */}
+          <div className="col-span-2 lg:col-span-1 min-w-0">
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{f.legal}</p>
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-1 lg:grid-cols-1 lg:gap-1.5">
+              <li><Link href="/personvern" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.privacyLocal}</Link></li>
+              <li><Link href="/vilkar" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.termsLocal}</Link></li>
+              <li><Link href="/privacy" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.privacyEn}</Link></li>
+              <li><Link href="/terms" className="text-gray-600 hover:text-blue-600 transition-colors break-words">{f.termsEn}</Link></li>
             </ul>
           </div>
         </div>
-        <div className="border-t border-gray-100 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-gray-400">© {new Date().getFullYear()} Hire2Skill. {f.rights}</p>
-          <p className="text-xs text-gray-400">{f.madeIn}</p>
+
+        <div className="border-t border-gray-100 mt-4 pt-3 flex flex-col sm:flex-row items-center justify-between gap-1.5">
+          <p className="text-[11px] text-gray-400 text-center sm:text-left">© {new Date().getFullYear()} Hire2Skill. {f.rights}</p>
+          <p className="text-[11px] text-gray-400">{f.madeIn}</p>
         </div>
       </div>
     </footer>

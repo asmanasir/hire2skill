@@ -1,23 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import HCaptcha from '@hcaptcha/react-hcaptcha'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getEmailGuardReason, normalizeEmail } from '@/lib/email-guard'
+import { useLanguage } from '@/context/LanguageContext'
+import { fetchEmailRegistered } from '@/lib/auth/fetch-email-registered'
 
 export default function ForgotPasswordPage() {
+  const { t } = useLanguage()
+  const L = t.login
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
-  const [captchaToken, setCaptchaToken] = useState('')
-  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim() ?? ''
-  const captchaEnabled = hcaptchaSiteKey.length > 0
+  const [noAccount, setNoAccount] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setNoAccount(false)
     setLoading(true)
     const normalizedEmail = normalizeEmail(email)
     const emailGuardReason = getEmailGuardReason(normalizedEmail)
@@ -44,8 +46,10 @@ export default function ForgotPasswordPage() {
         return
       }
     }
-    if (captchaEnabled && !captchaToken) {
-      setError('Please complete captcha verification.')
+
+    const registered = await fetchEmailRegistered(normalizedEmail)
+    if (registered === false) {
+      setNoAccount(true)
       setLoading(false)
       return
     }
@@ -53,7 +57,6 @@ export default function ForgotPasswordPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
-      captchaToken: captchaEnabled ? captchaToken : undefined,
     })
 
     setLoading(false)
@@ -115,13 +118,32 @@ export default function ForgotPasswordPage() {
                 Enter your email and we&apos;ll send you a link to reset it.
               </p>
             </div>
-            {!captchaEnabled && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-                hCaptcha is not configured. Set `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` to enable bot protection.
+
+            {noAccount && (
+              <div
+                className="mb-4 flex gap-2.5 rounded-xl border border-red-200 bg-red-50/95 px-4 py-3 text-sm text-red-900"
+                role="alert"
+              >
+                <span
+                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-200 text-xs font-bold text-red-800"
+                  aria-hidden
+                >
+                  !
+                </span>
+                <p className="min-w-0 leading-snug">
+                  {L.accountNotFoundIntro}{' '}
+                  <Link
+                    href="/signup"
+                    className="font-semibold text-blue-700 underline decoration-blue-600/40 underline-offset-2 hover:text-blue-900"
+                  >
+                    {L.accountNotFoundLink}
+                  </Link>
+                  .
+                </p>
               </div>
             )}
 
-            {error && (
+            {error && !noAccount && (
               <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 border border-red-100">
                 {error}
               </div>
@@ -134,7 +156,10 @@ export default function ForgotPasswordPage() {
                   type="email"
                   required
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => {
+                    setEmail(e.target.value)
+                    setNoAccount(false)
+                  }}
                   placeholder="you@example.com"
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                 />
@@ -148,16 +173,6 @@ export default function ForgotPasswordPage() {
               >
                 {loading ? 'Sending...' : 'Send reset link'}
               </button>
-              {captchaEnabled && (
-                <div className="pt-1">
-                  <HCaptcha
-                    sitekey={hcaptchaSiteKey}
-                    onVerify={token => setCaptchaToken(token)}
-                    onExpire={() => setCaptchaToken('')}
-                    onError={() => setError('Captcha verification failed. Please try again.')}
-                  />
-                </div>
-              )}
             </form>
 
             <p className="mt-6 text-center text-sm text-gray-500">

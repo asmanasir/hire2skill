@@ -8,6 +8,8 @@ export type TaskerListItem = {
   hourly_rate: number
   categories: string[]
   location: string
+  latitude: number | null
+  longitude: number | null
   verified: boolean
   tasks_done: number
   rating: number
@@ -41,6 +43,8 @@ type HelperProfileRow = {
   hourly_rate: number | null
   categories: string[] | null
   location: string | null
+  latitude: number | null
+  longitude: number | null
   verified: boolean | null
   tasks_done: number | null
   rating: number | null
@@ -61,7 +65,7 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
 
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, display_name, bio, hourly_rate, categories, location, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url, languages, brings_tools, can_invoice')
+    .select('id, display_name, bio, hourly_rate, categories, location, latitude, longitude, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url, languages, brings_tools, can_invoice')
     .eq('role', 'helper')
     .order('tasks_done', { ascending: false })
     .limit(100)
@@ -70,7 +74,7 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
   if (user) {
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, bio, hourly_rate, categories, location, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url, languages, brings_tools, can_invoice, role')
+      .select('id, display_name, bio, hourly_rate, categories, location, latitude, longitude, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url, languages, brings_tools, can_invoice, role')
       .eq('id', user.id)
       .single()
     if (data?.role === 'helper') {
@@ -81,6 +85,8 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
         hourly_rate: data.hourly_rate,
         categories: data.categories,
         location: data.location,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
         verified: data.verified,
         tasks_done: data.tasks_done,
         rating: data.rating,
@@ -111,6 +117,8 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
           hourly_rate: p.hourly_rate ?? 0,
           categories: p.categories ?? [],
           location: p.location?.trim() || 'Norway',
+          latitude: p.latitude ?? null,
+          longitude: p.longitude ?? null,
           verified: Boolean(p.verified),
           tasks_done: p.tasks_done ?? 0,
           rating: (p.avg_rating ?? p.rating ?? 0),
@@ -124,6 +132,8 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
     : (FEATURES.enableDemoData
         ? SAMPLE_TASKERS.map(p => ({
             ...p,
+            latitude: null,
+            longitude: null,
             avatar_url: null,
             review_count: 0,
             languages: p.languages ?? [],
