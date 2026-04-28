@@ -60,7 +60,7 @@ const nextConfig: NextConfig = {
               "form-action 'self'",
               "object-src 'none'",
               "frame-ancestors 'none'",
-              "img-src 'self' data: https:",
+              "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
               scriptSrc,

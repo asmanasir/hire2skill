@@ -23,25 +23,19 @@ export type RealHelper = {
   hourlyRate: number | null
 }
 
-const SAMPLE_JOBS = [
-  { title: 'Help moving furniture',    location: 'Oslo',      price: 500, category: 'Moving',   urgent: true },
-  { title: 'House cleaning – 3 rooms', location: 'Bergen',    price: 350, category: 'Cleaning', urgent: true },
-  { title: 'Event assistant – weekend',location: 'Trondheim', price: 280, category: 'Events',   urgent: true },
-  { title: 'English tutoring for kids',location: 'Oslo',      price: 400, category: 'Tutoring', urgent: false },
-  { title: 'Grocery delivery – elderly',location: 'Stavanger',price: 150, category: 'Delivery', urgent: false },
-]
-
 export default async function Home() {
   const supabase = await createClient()
+  const now = Date.now()
+  const recentJobWindowMs = FEATURES.recentJobsWindowHours * 60 * 60 * 1000
 
   const [
     { data: recentPosts },
     { data: helperProfiles },
   ] = await Promise.all([
     supabase.from('posts')
-      .select('id, title, category, location, price, created_at')
+      .select('id, title, description, category, location, price, status, created_at')
       .order('created_at', { ascending: false })
-      .limit(5),
+      .limit(20),
     supabase.from('profiles')
       .select('id, display_name, avatar_url, categories, location, hourly_rate')
       .eq('role', 'helper')
@@ -52,9 +46,14 @@ export default async function Home() {
       .limit(6),
   ])
 
-  const jobs = recentPosts && recentPosts.length >= 3
-    ? recentPosts.map(p => ({ ...p, urgent: false }))
-    : (FEATURES.enableDemoData ? SAMPLE_JOBS : [])
+  const jobs = (recentPosts ?? [])
+    .filter((p) => !['cancelled', 'completed', 'closed'].includes((p.status ?? '').toLowerCase()))
+    .filter((p) => {
+      const createdAt = p.created_at ? new Date(p.created_at).getTime() : 0
+      return createdAt > 0 && now - createdAt <= recentJobWindowMs
+    })
+    .slice(0, 5)
+    .map(({ status: _status, ...p }) => ({ ...p, urgent: false }))
 
   const helpers: RealHelper[] | null =
     helperProfiles && helperProfiles.length >= 1

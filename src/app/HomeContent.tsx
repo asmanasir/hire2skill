@@ -8,7 +8,16 @@ import { ArrowRight, Bolt, CheckCircle2, Search } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
 import type { RealHelper } from './page'
 
-type Job = { id?: string; title: string; location: string; price: number | null; category: string; urgent?: boolean }
+type Job = {
+  id?: string
+  title: string
+  description?: string | null
+  location: string
+  price: number | null
+  category: string
+  urgent?: boolean
+  created_at?: string
+}
 
 const JOB_CARD_IMAGES: Record<string, string> = {
   cleaning: '/home/cleaning-apartment-modern-1.png',
@@ -50,14 +59,6 @@ const HERO_LOCATIONS = [
   'Tromso',
 ]
 
-const DEFAULT_JOBS: Job[] = [
-  { title: 'Cleaning help needed', location: 'Grunerlokka, Oslo', price: 1200, category: 'Cleaning', urgent: true },
-  { title: 'Moving help needed', location: 'Sentrum, Oslo', price: 1800, category: 'Moving', urgent: true },
-  { title: 'Handyman needed', location: 'St. Hanshaugen, Oslo', price: 900, category: 'Handyman', urgent: false },
-  { title: 'Grocery shopping', location: 'Majorstuen, Oslo', price: 500, category: 'Shopping', urgent: false },
-  { title: 'Home cooking today', location: 'Frogner, Oslo', price: 700, category: 'Cooking', urgent: false },
-]
-
 function getImageForCategory(category: string) {
   const key = category.toLowerCase().replace(/[^a-z]/g, '')
   if (JOB_CARD_IMAGES[key]) return JOB_CARD_IMAGES[key]
@@ -68,6 +69,52 @@ function getImageForCategory(category: string) {
   if (key.includes('move')) return '/home/moving-furniture-apartment-2.png'
   if (key.includes('clean')) return '/home/cleaning-apartment-modern-3.png'
   return '/home/cleaning-apartment-modern-3.png'
+}
+
+function cleanJobTitle(title: string) {
+  return title
+    .replace(/\s+/g, ' ')
+    .replace(/\s+in\s+[a-z]{1,3}\s*$/i, '')
+    .trim()
+}
+
+function cleanLocation(location: string) {
+  return location
+    .replace(/\s+/g, ' ')
+    .replace(/\s*-\s*/g, ' - ')
+    .trim()
+}
+
+function cleanJobDescription(description?: string | null) {
+  if (!description) return ''
+  return description
+    .replace(/task photos:\s*[\s\S]*$/i, '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function formatPostedTime(createdAt?: string) {
+  if (!createdAt) return ''
+  const ts = new Date(createdAt).getTime()
+  if (!Number.isFinite(ts) || ts <= 0) return ''
+  const deltaMs = Date.now() - ts
+  if (deltaMs < 60_000) return 'Just now'
+  const mins = Math.floor(deltaMs / 60_000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function getProposalHref(job: Job) {
+  if (job.id) return `/jobs?proposalJobId=${encodeURIComponent(job.id)}`
+  const params = new URLSearchParams()
+  if (job.title.trim()) params.set('q', job.title.trim())
+  if (job.location.trim()) params.set('location', job.location.trim())
+  const qs = params.toString()
+  return qs ? `/jobs?${qs}` : '/jobs'
 }
 
 export default function HomeContent({
@@ -85,7 +132,7 @@ export default function HomeContent({
   const [heroLocation, setHeroLocation] = useState('Oslo')
 
   const jobsStrip = useMemo(() => {
-    const source = jobs.length > 0 ? jobs : DEFAULT_JOBS
+    const source = jobs
     const q = query.trim().toLowerCase()
     const loc = heroLocation.trim().toLowerCase()
     const filtered = q
@@ -107,6 +154,14 @@ export default function HomeContent({
     router.push(qs ? `/jobs?${qs}` : '/jobs')
   }
 
+  function goToCurrentJobs() {
+    const loc = heroLocation.trim()
+    const params = new URLSearchParams()
+    if (loc && loc.toLowerCase() !== 'all norway') params.set('location', loc)
+    const qs = params.toString()
+    router.push(qs ? `/jobs?${qs}` : '/jobs')
+  }
+
   const trustText = h?.subtitle?.trim() || 'Hire trusted local people for moving, cleaning, quick tasks and more.'
 
   return (
@@ -116,10 +171,10 @@ export default function HomeContent({
           <div className="grid gap-4 p-4 md:grid-cols-[1.05fr_1fr] md:p-6">
             <div className="flex flex-col justify-center">
               <span className="mb-2 inline-flex w-fit rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                Built for Norway
+                {h?.badge ?? 'Built for Norway'}
               </span>
               <h1 className="max-w-lg text-3xl font-extrabold leading-tight text-slate-900 dark:text-white md:text-5xl">
-                Get help fast in your area
+                {h?.title1 ? `${h.title1} ${h?.title2 ?? ''}`.trim() : 'Get help fast in your area'}
               </h1>
               <p className="mt-3 max-w-lg text-sm text-slate-600 dark:text-slate-300">{trustText}</p>
 
@@ -151,18 +206,24 @@ export default function HomeContent({
 
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <Link href="/post" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700">
-                  Post a Job
+                  {t.nav.postJob}
+                </Link>
+                <Link
+                  href="/taskers"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:text-blue-300"
+                >
+                  {h?.findWorkerCta ?? 'Find Helper'}
                 </Link>
                 <button
                   type="button"
-                  onClick={handleHeroSearch}
+                  onClick={goToCurrentJobs}
                   className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:text-blue-300"
                 >
-                  Find Work
+                  {h?.seeCurrentJobsCta ?? 'See Current Jobs'}
                 </button>
               </div>
 
-              <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-300">Need help now? Post a job in 30 seconds</p>
+              <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-300">{h?.seasonalSummerBody ?? 'Need help now? Post a job in 30 seconds'}</p>
             </div>
 
             <div className="relative h-56 overflow-hidden rounded-3xl md:h-full md:min-h-[320px]">
@@ -181,46 +242,93 @@ export default function HomeContent({
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Jobs happening now</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-300">Real people. Real jobs. Right now.</p>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">{h?.jobsNowTitle ?? 'Jobs happening now'}</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-300">{h?.jobsNowSub ?? 'Real people. Real jobs. Right now.'}</p>
             </div>
-            <Link href="/jobs" className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">See all jobs</Link>
+            <Link href="/jobs" className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">{h?.seeAllJobs ?? 'See all jobs'}</Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {jobsStrip.map((job, idx) => (
-              <Link
+              <article
                 key={`${job.id ?? job.title}-${idx}`}
-                href={job.id ? `/jobs?jobId=${encodeURIComponent(job.id)}` : `/jobs?q=${encodeURIComponent(job.title)}`}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
               >
-                <div className="relative h-24">
-                  <Image
-                    src={getImageForCategory(job.category)}
-                    alt={job.category}
-                    fill
-                    sizes="(max-width: 1280px) 50vw, 20vw"
-                    className="object-cover"
-                  />
-                  <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
-                    {job.urgent ? 'Urgent' : 'Open'}
+                <Link
+                  href={job.id ? `/jobs?jobId=${encodeURIComponent(job.id)}` : `/jobs?q=${encodeURIComponent(job.title)}`}
+                  className="block"
+                >
+                  <div className="relative h-44">
+                    <Image
+                      src={getImageForCategory(job.category)}
+                      alt={job.category}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                      className="object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute left-3 top-3 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-semibold text-white">
+                      {job.urgent ? `🔥 ${h?.urgent ?? 'Urgent'}` : `🔥 ${h?.openTag ?? 'Open'}`}
+                    </div>
+                    {formatPostedTime(job.created_at) ? (
+                      <div className="absolute right-3 top-3 rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
+                        {formatPostedTime(job.created_at)}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-                <div className="p-3">
-                  <h3 className="line-clamp-1 text-sm font-bold text-slate-900 dark:text-slate-100">{job.title}</h3>
-                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-300">{job.location}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="text-sm font-extrabold text-emerald-600">{job.price ? `${job.price} NOK` : 'Budget TBD'}</p>
-                    <span className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white">View Job</span>
+                </Link>
+                <div className="space-y-2 p-4">
+                  <Link
+                    href={job.id ? `/jobs?jobId=${encodeURIComponent(job.id)}` : `/jobs?q=${encodeURIComponent(job.title)}`}
+                    className="block"
+                  >
+                    <h3 className="line-clamp-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {cleanJobTitle(job.title)}
+                    </h3>
+                  </Link>
+                  <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
+                    <span className="line-clamp-1">📍 {cleanLocation(job.location)}</span>
+                    <span>•</span>
+                    <span className="font-semibold text-emerald-600">💰 {job.price ? `${job.price} NOK` : (h?.budgetTbd ?? 'Budget TBD')}</span>
                   </div>
+                  <p className="line-clamp-1 text-sm text-slate-600 dark:text-slate-300">
+                    {cleanJobDescription(job.description) || cleanJobTitle(job.title)}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+                      {job.category}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+                      {h?.openTag ?? 'Open'}
+                    </span>
+                  </div>
+                  <Link
+                    href={getProposalHref(job)}
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                  >
+                    {h?.sendProposalCta ?? 'Send proposal'}
+                  </Link>
                 </div>
-              </Link>
+              </article>
             ))}
+            {jobsStrip.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 sm:col-span-2 xl:col-span-5">
+                <p>{h?.noCurrentJobs ?? 'No current open jobs in this location yet.'}</p>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <Link href="/jobs" className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100 dark:hover:text-blue-300">
+                    {h?.seeAllJobs ?? 'See all jobs'}
+                  </Link>
+                  <Link href="/post" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
+                    {t.nav.postJob}
+                  </Link>
+                </div>
+              </div>
+            ) : null}
           </div>
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Popular services</h2>
-          <p className="mb-3 text-xs text-slate-500 dark:text-slate-300">Most requested by people in your area</p>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">{h?.popularServicesTitle ?? 'Popular services'}</h2>
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-300">{h?.popularServicesSub ?? 'Most requested by people in your area'}</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {POPULAR_SERVICES.map((service) => (
               <Link key={service.label} href={service.href} className="group relative h-24 overflow-hidden rounded-2xl">
@@ -239,7 +347,7 @@ export default function HomeContent({
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="mb-3 text-xl font-extrabold text-slate-900 dark:text-white">Browse by category</h2>
+          <h2 className="mb-3 text-xl font-extrabold text-slate-900 dark:text-white">{h?.browseByCategoryTitle ?? 'Browse by category'}</h2>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {BROWSE_CATEGORIES.map((item) => (
               <Link
@@ -256,16 +364,16 @@ export default function HomeContent({
             ))}
           </div>
           <div className="mt-3 flex justify-center">
-            <Link href="/services" className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">Explore all services</Link>
+            <Link href="/services" className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">{h?.exploreAllServices ?? 'Explore all services'}</Link>
           </div>
         </section>
 
         <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { value: '8,000+', label: 'Tasks completed' },
-            { value: '2,400+', label: 'Verified helpers' },
-            { value: '4.9+', label: 'Average rating' },
-            { value: '100%', label: 'Safe & secure' },
+            { value: '8,000+', label: h?.tasksCompletedLabel ?? 'Tasks completed' },
+            { value: '2,400+', label: h?.verifiedHelpersLabel ?? 'Verified helpers' },
+            { value: '4.9+', label: h?.averageRatingLabel ?? 'Average rating' },
+            { value: '100%', label: h?.safeSecureLabel ?? 'Safe & secure' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center dark:border-slate-700 dark:bg-slate-800">
               <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{stat.value}</p>
@@ -280,25 +388,28 @@ export default function HomeContent({
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-extrabold text-emerald-900">Earn money your way</h3>
-              <p className="text-sm text-emerald-800">Work when you want, choose jobs you like, and get paid quickly.</p>
+              <h3 className="text-lg font-extrabold text-emerald-900">{h?.earnTitle ?? 'Earn money your way'}</h3>
+              <p className="text-sm text-emerald-800">{h?.earnSub ?? 'Work when you want, choose jobs you like, and get paid quickly.'}</p>
             </div>
           </div>
           <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">
             <Bolt className="h-4 w-4" />
-            Start Earning
+            {h?.startEarning ?? 'Start Earning'}
           </Link>
         </section>
 
         <section className="rounded-3xl bg-gradient-to-r from-blue-700 to-blue-500 p-5 text-white shadow-sm">
-          <h2 className="text-2xl font-extrabold">Ready to get started?</h2>
-          <p className="mt-1 text-sm text-blue-100">Post a job and get help in minutes.</p>
+          <h2 className="text-2xl font-extrabold">{h?.readyTitle ?? 'Ready to get started?'}</h2>
+          <p className="mt-1 text-sm text-blue-100">{h?.readySub ?? 'Post a job and get help in minutes.'}</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Link href="/post" className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50">
-              Post a Job
+              {t.nav.postJob}
+            </Link>
+            <Link href="/taskers" className="inline-flex items-center justify-center rounded-xl border border-white/60 px-5 py-2.5 text-sm font-bold text-white hover:bg-white/10">
+              {h?.findWorkerCta ?? 'Find Helper'}
             </Link>
             <Link href="/signup" className="inline-flex items-center justify-center rounded-xl border border-white/60 px-5 py-2.5 text-sm font-bold text-white hover:bg-white/10">
-              Start Earning
+              {h?.startEarning ?? 'Start Earning'}
             </Link>
           </div>
         </section>

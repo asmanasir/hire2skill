@@ -9,6 +9,11 @@ import { FEATURES } from '@/lib/features'
 import { useLanguage } from '@/context/LanguageContext'
 import { formatDateByLocale } from '@/lib/i18n/date'
 import { geocodeAddressNorway } from '@/lib/geo/geocode-client'
+import {
+  getLocalizedCountyOptions,
+  getLocalizedMunicipalityOptionsByCounty,
+  NORWAY_LOCATION_OPTIONS,
+} from '@/lib/norway-locations'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -107,40 +112,7 @@ const SERVICE_CATEGORIES = [
 
 const AVATAR_COLORS = ['#2563EB','#16A34A','#7C3AED','#D97706','#E11D48','#0284C7']
 
-const NORWAY_LOCATIONS = [
-  'Oslo – Sentrum','Oslo – Grünerløkka','Oslo – Grønland','Oslo – Tøyen',
-  'Oslo – Gamlebyen','Oslo – Sørenga','Oslo – Tjuvholmen','Oslo – Aker Brygge',
-  'Oslo – Bislett','Oslo – St. Hanshaugen',
-  'Oslo – Frogner','Oslo – Majorstuen','Oslo – Skøyen','Oslo – Lysaker',
-  'Oslo – Bygdøy','Oslo – Ullern','Oslo – Montebello','Oslo – Smestad',
-  'Oslo – Røa','Oslo – Vinderen','Oslo – Hovseter','Oslo – Holmenkollen',
-  'Oslo – Sagene','Oslo – Sandaker','Oslo – Storo','Oslo – Nydalen',
-  'Oslo – Sinsen','Oslo – Grefsen','Oslo – Kjelsås','Oslo – Tåsen',
-  'Oslo – Alna','Oslo – Furuset','Oslo – Lindeberg','Oslo – Trosterud',
-  'Oslo – Ellingsrudåsen','Oslo – Haugerud','Oslo – Teisen','Oslo – Rødtvet',
-  'Oslo – Grorud','Oslo – Ammerud','Oslo – Romsås','Oslo – Kalbakken',
-  'Oslo – Stovner','Oslo – Haugenstua','Oslo – Vestli','Oslo – Karihaugen',
-  'Oslo – Bjerke','Oslo – Veitvet','Oslo – Carl Berner','Oslo – Helsfyr',
-  'Oslo – Valle Hovin','Oslo – Nordstrand','Oslo – Ljan','Oslo – Ekeberg',
-  'Oslo – Lambertseter','Oslo – Manglerud','Oslo – Ryen','Oslo – Bryn',
-  'Oslo – Oppsal','Oslo – Bøler','Oslo – Holmlia','Oslo – Mortensrud',
-  'Oslo – Bjørndal','Oslo – Prinsdal',
-  'Bergen – Sentrum','Bergen – Sandviken','Bergen – Nordnes','Bergen – Møhlenpris',
-  'Bergen – Fana','Bergen – Nesttun','Bergen – Paradis','Bergen – Rådal',
-  'Bergen – Ytrebygda','Bergen – Fyllingsdalen','Bergen – Laksevåg',
-  'Bergen – Loddefjord','Bergen – Åsane','Bergen – Arna','Bergen – Indre Arna',
-  'Trondheim – Midtbyen','Trondheim – Møllenberg','Trondheim – Strindheim',
-  'Trondheim – Ranheim','Trondheim – Lerkendal','Trondheim – Singsaker',
-  'Trondheim – Nardo','Trondheim – Heimdal','Trondheim – Saupstad',
-  'Stavanger – Sentrum','Stavanger – Storhaug','Stavanger – Hillevåg',
-  'Stavanger – Hundvåg','Stavanger – Madla','Stavanger – Tasta','Stavanger – Eiganes',
-  'Drammen – Bragernes','Drammen – Strømsø','Drammen – Konnerud',
-  'Bærum','Asker','Jessheim','Lillestrøm','Lørenskog','Ski','Oppegård',
-  'Kristiansand','Tromsø','Sandnes','Fredrikstad','Sarpsborg','Bodø',
-  'Ålesund','Tønsberg','Moss','Hamar','Porsgrunn','Skien','Arendal',
-  'Haugesund','Larvik','Halden','Lillehammer','Molde','Harstad','Gjøvik',
-  'Alta','Hammerfest','Narvik','Tromsø','Mo i Rana',
-]
+const NORWAY_LOCATIONS = NORWAY_LOCATION_OPTIONS
 
 const DEFAULT_NOTIF: Record<string, boolean> = {
   task_email: true, task_sms: true, task_push: true,
@@ -577,6 +549,14 @@ export default function ProfileContent({
   const { locale, t } = useLanguage()
   const tabs = useMemo(() => getProfileTabs(t), [t])
   const saveUi = useMemo(() => getProfileSaveUi(locale), [locale])
+  const locationPickerUi = useMemo(() => {
+    if (locale === 'no') return { chooseCounty: 'Velg område', chooseMunicipality: 'Velg by/kommune', selectCountyFirst: 'Velg område først' }
+    if (locale === 'da') return { chooseCounty: 'Vælg område', chooseMunicipality: 'Vælg by/kommune', selectCountyFirst: 'Vælg område først' }
+    if (locale === 'sv') return { chooseCounty: 'Välj område', chooseMunicipality: 'Välj stad/kommun', selectCountyFirst: 'Välj område först' }
+    return { chooseCounty: 'Choose area', chooseMunicipality: 'Choose city/municipality', selectCountyFirst: 'Select area first' }
+  }, [locale])
+  const localizedCountyOptions = useMemo(() => getLocalizedCountyOptions(locale), [locale])
+  const localizedMunicipalityByCounty = useMemo(() => getLocalizedMunicipalityOptionsByCounty(locale), [locale])
   const router = useRouter()
   const initialTabKey =
     initialTab && tabs.some((tabItem) => tabItem.key === initialTab) ? initialTab : 'profile'
@@ -586,6 +566,7 @@ export default function ProfileContent({
   const [name, setName]           = useState(init?.display_name ?? '')
   const [bio, setBio]             = useState(init?.bio ?? '')
   const [location, setLocation]   = useState(init?.location ?? '')
+  const [selectedCounty, setSelectedCounty] = useState('')
   const [rate, setRate]           = useState(String(init?.hourly_rate ?? ''))
   const [cats, setCats]           = useState<string[]>(init?.categories ?? [])
   const [avatar, setAvatar]       = useState<string | null>(init?.avatar_url ?? null)
@@ -734,6 +715,11 @@ export default function ProfileContent({
     } else {
       setShowLocSuggestions(false)
     }
+  }
+
+  function selectCounty(county: string) {
+    setSelectedCounty(county)
+    setShowLocSuggestions(false)
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────────
@@ -1032,6 +1018,38 @@ export default function ProfileContent({
                   </div>
                   <div>
                     <FieldLabel>Location</FieldLabel>
+                    <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <select
+                        value={selectedCounty}
+                        onChange={(e) => selectCounty(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+                      >
+                        <option value="">{locationPickerUi.chooseCounty}</option>
+                        {localizedCountyOptions.map((county) => (
+                          <option key={county.value} value={county.value}>
+                            {county.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setLocation(e.target.value)
+                            setShowLocSuggestions(false)
+                          }
+                        }}
+                        disabled={!selectedCounty}
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition disabled:cursor-not-allowed disabled:bg-gray-100"
+                      >
+                        <option value="">{selectedCounty ? locationPickerUi.chooseMunicipality : locationPickerUi.selectCountyFirst}</option>
+                        {(localizedMunicipalityByCounty[selectedCounty] ?? []).map((municipality) => (
+                          <option key={municipality.value} value={municipality.value}>
+                            {municipality.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div ref={locRef} className="relative">
                       <div className="relative">
                         <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"

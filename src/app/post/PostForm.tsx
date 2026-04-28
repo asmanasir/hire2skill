@@ -10,6 +10,11 @@ import { categoryIconProps } from '@/lib/category-icon'
 import { useLanguage } from '@/context/LanguageContext'
 import { formatDateByLocale } from '@/lib/i18n/date'
 import { postNotify } from '@/lib/client-notify'
+import {
+  getLocalizedCountyOptions,
+  getLocalizedMunicipalityOptionsByCounty,
+  NORWAY_LOCATION_OPTIONS,
+} from '@/lib/norway-locations'
 import ConfirmActionModal from '@/components/ConfirmActionModal'
 
 const CATEGORIES: { key: string; bg: string; color: string; Icon: React.ElementType }[] = CATEGORY_LABELS
@@ -484,22 +489,7 @@ function localizeScopingText(text: string, locale: 'no' | 'en' | 'da' | 'sv') {
   return mapped ?? text
 }
 
-const NORWAY_LOCATIONS = [
-  'Oslo – Sentrum', 'Oslo – Grünerløkka', 'Oslo – Grønland', 'Oslo – Tøyen',
-  'Oslo – Frogner', 'Oslo – Majorstuen', 'Oslo – Skøyen', 'Oslo – Bygdøy',
-  'Oslo – Sagene', 'Oslo – Nydalen', 'Oslo – Storo', 'Oslo – Furuset',
-  'Oslo – Grorud', 'Oslo – Stovner', 'Oslo – Nordstrand', 'Oslo – Holmlia',
-  'Bergen – Sentrum', 'Bergen – Bergenhus', 'Bergen – Sandviken', 'Bergen – Fana',
-  'Bergen – Fyllingsdalen', 'Bergen – Åsane', 'Bergen – Arna', 'Bergen – Laksevåg',
-  'Trondheim – Midtbyen', 'Trondheim – Nedre Elvehavn', 'Trondheim – Lerkendal',
-  'Trondheim – Heimdal', 'Trondheim – Byåsen', 'Trondheim – Strindheim',
-  'Stavanger – Sentrum', 'Stavanger – Storhaug', 'Stavanger – Madla',
-  'Stavanger – Eiganes', 'Stavanger – Hundvåg', 'Stavanger – Tasta',
-  'Kristiansand', 'Tromsø', 'Sandnes', 'Fredrikstad', 'Sarpsborg',
-  'Bodø', 'Ålesund', 'Tønsberg', 'Drammen', 'Moss', 'Hamar',
-  'Lillehammer', 'Molde', 'Harstad', 'Gjøvik', 'Kongsberg',
-  'Bærum', 'Asker', 'Lillestrøm', 'Lørenskog', 'Ski',
-]
+const NORWAY_LOCATIONS = NORWAY_LOCATION_OPTIONS
 
 type Step = 1 | 2 | 3 | 4
 
@@ -607,6 +597,9 @@ function getPostFormUi(locale: 'no' | 'en' | 'da' | 'sv') {
       taskDescriptionPlaceholder: 'Gi detaljer om hva som skal gjøres, spesielle krav og omfang...',
       locationSearch: 'Søk by eller nabolag...',
       searchingAddresses: 'Søker etter flere adresser i nærheten…',
+      chooseCounty: 'Velg område',
+      chooseMunicipality: 'Velg by/kommune',
+      selectCountyFirst: 'Velg område først',
       budget: 'Budsjett',
       preferredDate: 'Foretrukket dato',
       optional: '(valgfritt)',
@@ -663,6 +656,9 @@ function getPostFormUi(locale: 'no' | 'en' | 'da' | 'sv') {
     taskDescriptionPlaceholder: 'Give details about what needs to be done, any special requirements, size of the job...',
     locationSearch: 'Search city or neighbourhood...',
     searchingAddresses: 'Searching more nearby addresses…',
+    chooseCounty: 'Choose area',
+    chooseMunicipality: 'Choose city/municipality',
+    selectCountyFirst: 'Select area first',
     budget: 'Budget',
     preferredDate: 'Preferred date',
     optional: '(optional)',
@@ -747,6 +743,8 @@ function ProgressBar({ step, labels }: { step: Step; labels: string[] }) {
 export default function PostForm() {
   const { locale, t } = useLanguage()
   const ui = useMemo(() => getPostFormUi(locale), [locale])
+  const localizedCountyOptions = useMemo(() => getLocalizedCountyOptions(locale), [locale])
+  const localizedMunicipalityByCounty = useMemo(() => getLocalizedMunicipalityOptionsByCounty(locale), [locale])
   const router = useRouter()
   const [step, setStep] = useState<Step>(1)
   const [category, setCategory] = useState('')
@@ -763,10 +761,11 @@ export default function PostForm() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [scopingAnswers, setScopingAnswers] = useState<Record<string, string>>({})
+  const [scopingAnswers, setScopingAnswers] = useState<Record<string, string[]>>({})
   const [locSuggestions, setLocSuggestions] = useState<string[]>([])
   const [showLocSuggestions, setShowLocSuggestions] = useState(false)
   const [locSearching, setLocSearching] = useState(false)
+  const [selectedCounty, setSelectedCounty] = useState('')
   const [confirmDuplicateOpen, setConfirmDuplicateOpen] = useState(false)
   const [confirmDuplicateMessage, setConfirmDuplicateMessage] = useState('')
   const [serviceQuery, setServiceQuery] = useState('')
@@ -850,10 +849,10 @@ export default function PostForm() {
 
   const scopingSummary = useMemo(() => {
     return Object.entries(scopingAnswers)
-      .filter(([, v]) => v)
-      .map(([k, v]) => {
+      .filter(([, values]) => values.length > 0)
+      .map(([k, values]) => {
         const q = localizedScopingQuestions[category]?.find(q => q.id === k)
-        return q ? `${q.label}: ${v}` : null
+        return q ? `${q.label}: ${values.join(', ')}` : null
       })
       .filter(Boolean)
       .join(' · ')
@@ -950,6 +949,16 @@ export default function PostForm() {
       .slice(0, 8)
     setLocSuggestions(matches)
     setShowLocSuggestions(matches.length > 0)
+  }
+
+  function selectCounty(county: string) {
+    setSelectedCounty(county)
+    setShowLocSuggestions(false)
+  }
+
+  function selectMunicipality(municipality: string) {
+    handleLocChange(municipality)
+    setShowLocSuggestions(false)
   }
 
   function validateStep2() {
@@ -1272,19 +1281,26 @@ export default function PostForm() {
                       <p className="text-sm font-semibold text-gray-800 mb-2">{q.label}</p>
                       <div className="flex flex-wrap gap-2">
                         {q.options.map(opt => {
-                          const selected = scopingAnswers[q.id] === opt
+                          const selectedOptions = scopingAnswers[q.id] ?? []
+                          const selected = selectedOptions.includes(opt)
                           return (
                             <button key={opt} type="button"
                               onClick={() => {
-                                const nextAnswers = { ...scopingAnswers, [q.id]: selected ? '' : opt }
+                                const nextSelected = selected
+                                  ? selectedOptions.filter((item) => item !== opt)
+                                  : [...selectedOptions, opt]
+                                const nextAnswers = { ...scopingAnswers, [q.id]: nextSelected }
+                                if (nextSelected.length === 0) {
+                                  delete nextAnswers[q.id]
+                                }
                                 setScopingAnswers(nextAnswers)
                                 if (!descriptionTouched) {
                                   const loc = location.trim() || ui.locationFallbackCity
                                   const nextSummary = Object.entries(nextAnswers)
-                                    .filter(([, v]) => v)
-                                    .map(([k, v]) => {
+                                    .filter(([, values]) => values.length > 0)
+                                    .map(([k, values]) => {
                                       const item = localizedScopingQuestions[category]?.find((qq) => qq.id === k)
-                                      return item ? `${item.label}: ${v}` : null
+                                      return item ? `${item.label}: ${values.join(', ')}` : null
                                     })
                                     .filter(Boolean)
                                     .join(' · ')
@@ -1367,6 +1383,35 @@ export default function PostForm() {
               {/* Location */}
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">{t.post.location} <span className="text-red-500">*</span></label>
+                <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <select
+                    value={selectedCounty}
+                    onChange={(e) => selectCounty(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">{ui.chooseCounty}</option>
+                    {localizedCountyOptions.map((county) => (
+                      <option key={county.value} value={county.value}>
+                        {county.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) selectMunicipality(e.target.value)
+                    }}
+                    disabled={!selectedCounty}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  >
+                    <option value="">{selectedCounty ? ui.chooseMunicipality : ui.selectCountyFirst}</option>
+                    {(localizedMunicipalityByCounty[selectedCounty] ?? []).map((municipality) => (
+                      <option key={municipality.value} value={municipality.value}>
+                        {municipality.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div ref={locRef} className="relative">
                   <div className="relative">
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

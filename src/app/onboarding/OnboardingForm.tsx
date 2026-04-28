@@ -1,11 +1,16 @@
 'use client'
 
 import React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { geocodeAddressNorway } from '@/lib/geo/geocode-client'
 import { useLanguage } from '@/context/LanguageContext'
+import {
+  getLocalizedCountyOptions,
+  getLocalizedMunicipalityOptionsByCounty,
+  NORWAY_LOCATION_OPTIONS,
+} from '@/lib/norway-locations'
 import {
   SprayCan, Truck, GraduationCap, Package, Wrench, PartyPopper, Monitor, Leaf,
   PawPrint, ChefHat, ShoppingBag, Wind, Scissors, Baby, Car, PaintBucket,
@@ -44,44 +49,7 @@ const CATEGORIES: { key: string; Icon: React.ElementType; bg: string; color: str
   { key: 'Music Lessons',      bg: '#EEF2FF', color: '#4338CA', Icon: Music },
 ]
 
-const NORWAY_LOCATIONS = [
-  'Oslo – Sentrum', 'Oslo – Grünerløkka', 'Oslo – Grønland', 'Oslo – Tøyen',
-  'Oslo – Gamlebyen', 'Oslo – Sørenga', 'Oslo – Tjuvholmen', 'Oslo – Aker Brygge',
-  'Oslo – Bislett', 'Oslo – St. Hanshaugen', 'Oslo – Frogner', 'Oslo – Majorstuen',
-  'Oslo – Skøyen', 'Oslo – Lysaker', 'Oslo – Bygdøy', 'Oslo – Ullern',
-  'Oslo – Røa', 'Oslo – Vinderen', 'Oslo – Holmenkollen', 'Oslo – Sagene',
-  'Oslo – Sandaker', 'Oslo – Storo', 'Oslo – Nydalen', 'Oslo – Sinsen',
-  'Oslo – Grefsen', 'Oslo – Kjelsås', 'Oslo – Tåsen', 'Oslo – Alna',
-  'Oslo – Furuset', 'Oslo – Lindeberg', 'Oslo – Trosterud', 'Oslo – Haugerud',
-  'Oslo – Teisen', 'Oslo – Grorud', 'Oslo – Ammerud', 'Oslo – Romsås',
-  'Oslo – Stovner', 'Oslo – Haugenstua', 'Oslo – Vestli', 'Oslo – Bjerke',
-  'Oslo – Helsfyr', 'Oslo – Nordstrand', 'Oslo – Ljan', 'Oslo – Ekeberg',
-  'Oslo – Lambertseter', 'Oslo – Manglerud', 'Oslo – Ryen', 'Oslo – Bryn',
-  'Oslo – Oppsal', 'Oslo – Bøler', 'Oslo – Holmlia', 'Oslo – Mortensrud',
-  'Bergen – Sentrum', 'Bergen – Bergenhus', 'Bergen – Sandviken', 'Bergen – Nygårdshøyden',
-  'Bergen – Nordnes', 'Bergen – Møhlenpris', 'Bergen – Fana', 'Bergen – Nesttun',
-  'Bergen – Paradis', 'Bergen – Fyllingsdalen', 'Bergen – Laksevåg', 'Bergen – Loddefjord',
-  'Bergen – Åsane', 'Bergen – Flaktveit', 'Bergen – Arna',
-  'Trondheim – Midtbyen', 'Trondheim – Nedre Elvehavn', 'Trondheim – Møllenberg',
-  'Trondheim – Rosenborg', 'Trondheim – Strindheim', 'Trondheim – Ranheim',
-  'Trondheim – Lerkendal', 'Trondheim – Singsaker', 'Trondheim – Nardo',
-  'Trondheim – Heimdal', 'Trondheim – Saupstad', 'Trondheim – Byåsen',
-  'Stavanger – Sentrum', 'Stavanger – Stavanger Øst', 'Stavanger – Storhaug',
-  'Stavanger – Hillevåg', 'Stavanger – Hundvåg', 'Stavanger – Madla',
-  'Stavanger – Tasta', 'Stavanger – Eiganes', 'Stavanger – Våland',
-  'Drammen – Bragernes', 'Drammen – Strømsø', 'Drammen – Fjell', 'Drammen – Konnerud',
-  'Kristiansand', 'Tromsø', 'Sandnes', 'Fredrikstad', 'Sarpsborg',
-  'Bodø', 'Sandefjord', 'Ålesund', 'Tønsberg', 'Moss', 'Hamar',
-  'Porsgrunn', 'Skien', 'Arendal', 'Haugesund', 'Larvik', 'Halden',
-  'Lillehammer', 'Molde', 'Harstad', 'Gjøvik', 'Horten', 'Kongsberg',
-  'Bærum', 'Asker', 'Jessheim', 'Lillestrøm', 'Lørenskog', 'Ski',
-  'Oppegård', 'Ås', 'Nesodden', 'Frogn', 'Vestby', 'Ullensaker',
-  'Nannestad', 'Eidsvoll', 'Nittedal', 'Rælingen', 'Skedsmo',
-  'Karmøy', 'Sola', 'Askøy', 'Kongsvinger', 'Elverum', 'Brumunddal',
-  'Namsos', 'Steinkjer', 'Levanger', 'Stjørdal',
-  'Alta', 'Hammerfest', 'Vadsø', 'Kirkenes', 'Narvik',
-  'Finnsnes', 'Svolvær', 'Mo i Rana',
-]
+const NORWAY_LOCATIONS = NORWAY_LOCATION_OPTIONS
 
 function ProgressBar({ value }: { value: number }) {
   return (
@@ -113,14 +81,23 @@ export default function OnboardingForm({ userId, userEmail }: { userId: string; 
 
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<Role | null>(null)
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const o = t.onboarding
+  const localizedCountyOptions = useMemo(() => getLocalizedCountyOptions(locale), [locale])
+  const localizedMunicipalityByCounty = useMemo(() => getLocalizedMunicipalityOptionsByCounty(locale), [locale])
+  const locationPickerUi = useMemo(() => {
+    if (locale === 'no') return { chooseCounty: 'Velg område', chooseMunicipality: 'Velg by/kommune', selectCountyFirst: 'Velg område først' }
+    if (locale === 'da') return { chooseCounty: 'Vælg område', chooseMunicipality: 'Vælg by/kommune', selectCountyFirst: 'Vælg område først' }
+    if (locale === 'sv') return { chooseCounty: 'Välj område', chooseMunicipality: 'Välj stad/kommun', selectCountyFirst: 'Välj område först' }
+    return { chooseCounty: 'Choose area', chooseMunicipality: 'Choose city/municipality', selectCountyFirst: 'Select area first' }
+  }, [locale])
 
   const [displayName, setDisplayName] = useState(defaultName)
   const [bio, setBio] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
   const [categories, setCategories] = useState<string[]>([])
   const [location, setLocation] = useState('')
+  const [selectedCounty, setSelectedCounty] = useState('')
   const [videoIntroUrl, setVideoIntroUrl] = useState('')
   const [locSuggestions, setLocSuggestions] = useState<string[]>([])
   const [showLocSuggestions, setShowLocSuggestions] = useState(false)
@@ -161,6 +138,11 @@ export default function OnboardingForm({ userId, userEmail }: { userId: string; 
 
   function selectLocation(val: string) {
     setLocation(val)
+    setShowLocSuggestions(false)
+  }
+
+  function selectCounty(county: string) {
+    setSelectedCounty(county)
     setShowLocSuggestions(false)
   }
 
@@ -395,6 +377,35 @@ export default function OnboardingForm({ userId, userEmail }: { userId: string; 
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                       {o.locationLabel} <span className="text-red-400">*</span>
                     </label>
+                    <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <select
+                        value={selectedCounty}
+                        onChange={(e) => selectCounty(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition"
+                      >
+                        <option value="">{locationPickerUi.chooseCounty}</option>
+                        {localizedCountyOptions.map((county) => (
+                          <option key={county.value} value={county.value}>
+                            {county.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) selectLocation(e.target.value)
+                        }}
+                        disabled={!selectedCounty}
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition disabled:cursor-not-allowed disabled:bg-gray-100"
+                      >
+                        <option value="">{selectedCounty ? locationPickerUi.chooseMunicipality : locationPickerUi.selectCountyFirst}</option>
+                        {(localizedMunicipalityByCounty[selectedCounty] ?? []).map((municipality) => (
+                          <option key={municipality.value} value={municipality.value}>
+                            {municipality.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div ref={locRef} className="relative">
                       <div className="relative">
                         <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
