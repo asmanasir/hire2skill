@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Bolt, CheckCircle2, Search } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
-import type { RealHelper } from './page'
 
 type Job = {
   id?: string
@@ -17,6 +16,7 @@ type Job = {
   category: string
   urgent?: boolean
   created_at?: string
+  postedAgo?: string
 }
 
 const JOB_CARD_IMAGES: Record<string, string> = {
@@ -94,20 +94,6 @@ function cleanJobDescription(description?: string | null) {
     .trim()
 }
 
-function formatPostedTime(createdAt?: string) {
-  if (!createdAt) return ''
-  const ts = new Date(createdAt).getTime()
-  if (!Number.isFinite(ts) || ts <= 0) return ''
-  const deltaMs = Date.now() - ts
-  if (deltaMs < 60_000) return 'Just now'
-  const mins = Math.floor(deltaMs / 60_000)
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 function getProposalHref(job: Job) {
   if (job.id) return `/jobs?proposalJobId=${encodeURIComponent(job.id)}`
   const params = new URLSearchParams()
@@ -119,10 +105,8 @@ function getProposalHref(job: Job) {
 
 export default function HomeContent({
   jobs,
-  helpers,
 }: {
   jobs: Job[]
-  helpers: RealHelper[] | null
   enableDemoData: boolean
 }) {
   const { t } = useLanguage()
@@ -269,9 +253,9 @@ export default function HomeContent({
                     <div className="absolute left-3 top-3 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-semibold text-white">
                       {job.urgent ? `🔥 ${h?.urgent ?? 'Urgent'}` : `🔥 ${h?.openTag ?? 'Open'}`}
                     </div>
-                    {formatPostedTime(job.created_at) ? (
+                    {job.postedAgo ? (
                       <div className="absolute right-3 top-3 rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold text-white">
-                        {formatPostedTime(job.created_at)}
+                        {job.postedAgo}
                       </div>
                     ) : null}
                   </div>
