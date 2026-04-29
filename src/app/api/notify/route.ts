@@ -15,7 +15,8 @@ const RESEND_API_KEY = SERVER_ENV.RESEND_API_KEY
 const APP_URL =
   SERVER_ENV.NEXT_PUBLIC_APP_URL ??
   (process.env.NODE_ENV === 'production' ? null : 'http://localhost:3000')
-const FROM = 'Hire2Skill <no-reply@hire2skill.com>'
+const FROM_TX = 'Hire2Skill <no-reply@hire2skill.com>'
+const FROM_BROADCAST = 'Hire2Skill Updates <updates@hire2skill.com>'
 
 function configurePush() {
   const publicKey = SERVER_ENV.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -138,13 +139,27 @@ function htmlToText(html: string): string {
     .trim()
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+type SendEmailOptions = {
+  from?: string
+  replyTo?: string
+  headers?: Record<string, string>
+}
+
+async function sendEmail(to: string, subject: string, html: string, options?: SendEmailOptions) {
   if (!RESEND_API_KEY) return false
   const text = htmlToText(html)
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM, to, subject, html, text }),
+    body: JSON.stringify({
+      from: options?.from ?? FROM_TX,
+      to,
+      subject,
+      html,
+      text,
+      reply_to: options?.replyTo,
+      headers: options?.headers,
+    }),
   })
   if (!res.ok) {
     const providerBody = await res.text()
@@ -237,10 +252,31 @@ async function sendMarketingBroadcast(
   renderBody: (recipient: MarketingRecipient) => string,
 ) {
   if (!APP_URL || !RESEND_API_KEY || recipients.length === 0) return
+  const unsubscribeUrl = `${APP_URL}/profile?tab=notifications`
+  const unsubscribeMailto = 'mailto:support@hire2skill.com?subject=Unsubscribe%20from%20Hire2Skill%20updates'
   for (const group of chunk(recipients, 40)) {
     await Promise.allSettled(
       group.map((recipient) =>
-        sendEmail(recipient.email, subject, layout(renderBody(recipient))),
+        sendEmail(
+          recipient.email,
+          subject,
+          layout(`
+            ${renderBody(recipient)}
+            <hr style="border:none;border-top:1px solid #e4e4e7;margin:20px 0;" />
+            <p style="margin:0;color:#71717a;font-size:12px;line-height:1.6;">
+              Prefer fewer updates?
+              <a href="${unsubscribeUrl}" style="color:#4f46e5;">Manage email preferences</a>.
+            </p>
+          `),
+          {
+            from: FROM_BROADCAST,
+            replyTo: 'support@hire2skill.com',
+            headers: {
+              'List-Unsubscribe': `<${unsubscribeMailto}>, <${unsubscribeUrl}>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            },
+          },
+        ),
       ),
     )
   }
