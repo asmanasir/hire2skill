@@ -27,7 +27,8 @@ function configurePush() {
 
 type NotifyChannels = { email: boolean; push: boolean }
 type MailLocale = 'no' | 'en' | 'da' | 'sv'
-type MarketingRecipient = { id: string; email: string; name: string; locale: MailLocale }
+type RecipientRole = 'helper' | 'poster'
+type MarketingRecipient = { id: string; email: string; name: string; locale: MailLocale; role: RecipientRole }
 
 /** Respect profile toggles; null/missing profile JSON defaults to both channels on (legacy). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,6 +94,15 @@ function actionBlock(label: string, href: string) {
   `
 }
 
+function detailCard(title: string, subtitle: string) {
+  return `
+    <div style="margin:14px 0;padding:14px 16px;border:1px solid #e4e4e7;border-radius:10px;background:#fafafa;">
+      <p style="margin:0 0 4px;font-weight:700;color:#111827;">${title}</p>
+      <p style="margin:0;color:#4b5563;font-size:13px;">${subtitle}</p>
+    </div>
+  `
+}
+
 function layout(body: string) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f4f4f5;font-family:sans-serif;">
@@ -105,16 +115,36 @@ function layout(body: string) {
   <tr><td style="padding:32px 36px;color:#18181b;font-size:15px;line-height:1.6;">${body}</td></tr>
   <tr><td style="padding:20px 36px;background:#f4f4f5;color:#71717a;font-size:12px;">
     © 2026 Hire2Skill. You received this because you have an account on Hire2Skill.
+    <br/>Manage notification preferences:
+    <a href="${APP_URL ?? 'https://hire2skill.com'}/profile?tab=notifications" style="color:#4f46e5;">Notification settings</a>
   </td></tr>
 </table></td></tr></table></body></html>`
 }
 
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   if (!RESEND_API_KEY) return false
+  const text = htmlToText(html)
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
+    body: JSON.stringify({ from: FROM, to, subject, html, text }),
   })
   if (!res.ok) {
     const providerBody = await res.text()
@@ -156,12 +186,17 @@ async function loadMarketingRecipients(admin: any, excludeUserId?: string): Prom
 
   const { data: profiles } = await admin
     .from('profiles')
-    .select('id, display_name, notifications, languages')
+    .select('id, display_name, notifications, languages, role')
     .in('id', ids)
 
-  const profileById = new Map<string, { display_name: string | null; notifications: unknown; languages: string[] | null }>()
-  for (const p of (profiles ?? []) as Array<{ id: string; display_name: string | null; notifications: unknown; languages: string[] | null }>) {
-    profileById.set(p.id, { display_name: p.display_name, notifications: p.notifications, languages: p.languages })
+  const profileById = new Map<string, { display_name: string | null; notifications: unknown; languages: string[] | null; role: string | null }>()
+  for (const p of (profiles ?? []) as Array<{ id: string; display_name: string | null; notifications: unknown; languages: string[] | null; role: string | null }>) {
+    profileById.set(p.id, {
+      display_name: p.display_name,
+      notifications: p.notifications,
+      languages: p.languages,
+      role: p.role,
+    })
   }
 
   const recipients: MarketingRecipient[] = []
@@ -169,6 +204,7 @@ async function loadMarketingRecipients(admin: any, excludeUserId?: string): Prom
     const userId = u.id as string
     if (excludeUserId && userId === excludeUserId) continue
     const p = profileById.get(userId)
+    if (!p?.role || (p.role !== 'helper' && p.role !== 'poster')) continue
     const raw = p?.notifications
     const promoEmailEnabled =
       raw == null || typeof raw !== 'object' || Array.isArray(raw)
@@ -189,6 +225,7 @@ async function loadMarketingRecipients(admin: any, excludeUserId?: string): Prom
       email: u.email as string,
       name: p?.display_name?.trim() || 'there',
       locale,
+      role: p.role as RecipientRole,
     })
   }
   return recipients
@@ -543,21 +580,19 @@ export async function POST(req: NextRequest) {
       }
 
       const recipients = await loadMarketingRecipients(supabase, user.id)
+      const helperRecipients = recipients.filter((r) => r.role === 'helper')
       const safeTitle = sanitizeHtml((post.title ?? 'New job post').trim() || 'New job post')
       const safeCategory = sanitizeHtml((post.category ?? 'General').trim() || 'General')
       const safeLocation = sanitizeHtml((post.location ?? 'Norway').trim() || 'Norway')
       const browseUrl = `${APP_URL}/jobs`
 
       await sendMarketingBroadcast(
-        recipients,
+        helperRecipients,
         `New job posted: ${safeTitle}`,
         (recipient) => `
           <p style="margin:0 0 12px;">${tr(recipient.locale, 'hi')} ${sanitizeHtml(recipient.name)},</p>
           <p style="margin:0 0 14px;">${tr(recipient.locale, 'newJobPosted')}</p>
-          <div style="margin:14px 0;padding:14px 16px;border:1px solid #e4e4e7;border-radius:10px;background:#fafafa;">
-            <p style="margin:0 0 4px;font-weight:700;color:#111827;">${safeTitle}</p>
-            <p style="margin:0;color:#4b5563;font-size:13px;">${safeCategory} · ${safeLocation}</p>
-          </div>
+          ${detailCard(safeTitle, `${safeCategory} · ${safeLocation}`)}
           ${actionBlock(tr(recipient.locale, 'browseJobs'), browseUrl)}
         `,
       )
@@ -577,21 +612,19 @@ export async function POST(req: NextRequest) {
       }
 
       const recipients = await loadMarketingRecipients(supabase, user.id)
+      const posterRecipients = recipients.filter((r) => r.role === 'poster')
       const workerName = sanitizeHtml((worker.display_name ?? 'A new helper').trim() || 'A new helper')
       const workerCategory = sanitizeHtml(((worker.categories as string[] | null)?.[0] ?? 'General help').trim())
       const workerLocation = sanitizeHtml((worker.location ?? 'Norway').trim() || 'Norway')
       const helpersUrl = `${APP_URL}/taskers`
 
       await sendMarketingBroadcast(
-        recipients,
+        posterRecipients,
         `New helper joined Hire2Skill`,
         (recipient) => `
           <p style="margin:0 0 12px;">${tr(recipient.locale, 'hi')} ${sanitizeHtml(recipient.name)},</p>
           <p style="margin:0 0 14px;">${tr(recipient.locale, 'newHelperJoined')}</p>
-          <div style="margin:14px 0;padding:14px 16px;border:1px solid #e4e4e7;border-radius:10px;background:#fafafa;">
-            <p style="margin:0 0 4px;font-weight:700;color:#111827;">${workerName}</p>
-            <p style="margin:0;color:#4b5563;font-size:13px;">${workerCategory} · ${workerLocation}</p>
-          </div>
+          ${detailCard(workerName, `${workerCategory} · ${workerLocation}`)}
           ${actionBlock(tr(recipient.locale, 'findHelpers'), helpersUrl)}
         `,
       )
