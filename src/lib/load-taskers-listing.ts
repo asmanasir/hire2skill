@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { FEATURES } from '@/lib/features'
+import { cacheGet, cacheSet } from '@/lib/redis'
+
+const CACHE_KEY = 'taskers:list'
+const CACHE_TTL = 120 // 2 minutes
 
 export type TaskerListItem = {
   id: string
@@ -63,12 +67,18 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, display_name, bio, hourly_rate, categories, location, latitude, longitude, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url, languages, brings_tools, can_invoice')
-    .eq('role', 'helper')
-    .order('tasks_done', { ascending: false })
-    .limit(100)
+  // Try cache first; fall back to DB on miss or when Redis isn't configured
+  let profiles = await cacheGet<HelperProfileRow[]>(CACHE_KEY)
+  if (!profiles) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, display_name, bio, hourly_rate, categories, location, latitude, longitude, verified, tasks_done, rating, avg_rating, review_count, response_hours, avatar_url, languages, brings_tools, can_invoice')
+      .eq('role', 'helper')
+      .order('tasks_done', { ascending: false })
+      .limit(100)
+    profiles = data ?? []
+    void cacheSet(CACHE_KEY, profiles, CACHE_TTL)
+  }
 
   let ownHelperProfile: HelperProfileRow | null = null
   if (user) {
@@ -101,7 +111,7 @@ export async function loadTaskersListing(activeCategory?: string | null): Promis
     }
   }
 
-  const mergedProfiles = [...(profiles ?? [])]
+  const mergedProfiles = [...profiles]
   if (ownHelperProfile && !mergedProfiles.some(p => p.id === ownHelperProfile?.id)) {
     mergedProfiles.unshift(ownHelperProfile)
   }

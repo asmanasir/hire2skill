@@ -1099,6 +1099,9 @@ export default function PostForm() {
       },
     })
 
+    // Bust the cached jobs listing so the new post is visible immediately.
+    void fetch('/api/cache/invalidate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'jobs:open' }) })
+
     router.push(`/dashboard?posted=1${requestSent ? '&requestSent=1' : ''}`)
   }
 

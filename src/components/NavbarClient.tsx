@@ -51,9 +51,14 @@ export default function NavbarClient({
                 {t.nav.profile}
               </Link>
               {isAdmin && (
-                <Link href="/admin/verifications" className="hidden sm:block text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors border border-amber-200 rounded-lg px-2.5 py-1 bg-amber-50 hover:bg-amber-100">
-                  Admin
-                </Link>
+                <>
+                  <Link href="/admin/verifications" className="hidden sm:block text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors border border-amber-200 rounded-lg px-2.5 py-1 bg-amber-50 hover:bg-amber-100">
+                    Verifications
+                  </Link>
+                  <Link href="/admin/stats" className="hidden sm:block text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors border border-amber-200 rounded-lg px-2.5 py-1 bg-amber-50 hover:bg-amber-100">
+                    Stats
+                  </Link>
+                </>
               )}
               <RequestBell userId={userId} messageUnreadCount={unreadCount} />
               <LogoutButton />

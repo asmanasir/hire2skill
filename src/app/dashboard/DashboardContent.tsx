@@ -701,7 +701,7 @@ const ClipboardIcon = (
   </svg>
 )
 
-export default function DashboardContent({ email, postCount, recentPosts, posted, requestSent, role, bookings: initialBookings, currentUserId }: Props) {
+export default function DashboardContent({ email, postCount, recentPosts, posted, requestSent, role, bookings: initialBookings, currentUserId, profileMissing }: Props) {
   const router = useRouter()
   const { t, locale } = useLanguage()
   const d = t.dashboard
@@ -967,6 +967,41 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
       {/* ── OVERVIEW ── */}
       {activeTab === 'overview' && (
         <>
+          {/* Profile completeness nudge — only for helpers with missing fields */}
+          {isHelper && profileMissing.length > 0 && (
+            <Link
+              href="/profile"
+              className="mb-6 flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 hover:border-amber-300 hover:bg-amber-100 transition-colors"
+            >
+              <div className="h-10 w-10 shrink-0 rounded-xl bg-amber-100 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-amber-900">
+                  Complete your profile to get more bookings
+                  <span className="ml-2 text-xs font-semibold text-amber-600">
+                    {7 - profileMissing.length}/7 done
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-amber-700">
+                  Missing: {profileMissing.map(f =>
+                    f === 'name' ? 'display name' :
+                    f === 'avatar' ? 'profile photo' :
+                    f === 'bio' ? 'bio (30+ chars)' :
+                    f === 'rate' ? 'hourly rate' :
+                    f === 'categories' ? 'service categories' :
+                    f
+                  ).join(', ')}
+                </p>
+              </div>
+              <svg width="16" height="16" className="shrink-0 mt-0.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </Link>
+          )}
+
           {(() => {
             const requestsLabel = isHelper ? d.requestsReceived : d.requestsSent
             const proposalsLabel = isHelper ? d.proposalsSent : d.proposalsReceived

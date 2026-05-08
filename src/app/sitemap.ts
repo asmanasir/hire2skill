@@ -6,11 +6,17 @@ const BASE = 'https://hire2skill.com'
 export default async function sitemap() {
   const supabase = await createClient()
 
-  const { data: helpers } = await supabase
-    .from('profiles')
-    .select('id, updated_at')
-    .eq('role', 'helper')
-    .not('display_name', 'is', null)
+  const [{ data: helpers }, { data: jobs }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, updated_at')
+      .eq('role', 'helper')
+      .not('display_name', 'is', null),
+    supabase
+      .from('posts')
+      .select('id, created_at')
+      .or('status.is.null,status.eq.open'),
+  ])
 
   const staticRoutes = [
     { url: BASE, priority: 1.0, changeFrequency: 'daily' as const },
@@ -40,9 +46,17 @@ export default async function sitemap() {
     changeFrequency: 'weekly' as const,
   }))
 
+  const jobRoutes = (jobs ?? []).map(j => ({
+    url: `${BASE}/jobs/${j.id}`,
+    lastModified: j.created_at ? new Date(j.created_at) : new Date(),
+    priority: 0.75,
+    changeFrequency: 'weekly' as const,
+  }))
+
   return [
     ...staticRoutes.map(r => ({ ...r, lastModified: new Date() })),
     ...serviceRoutes,
     ...helperRoutes,
+    ...jobRoutes,
   ]
 }

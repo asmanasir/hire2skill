@@ -860,6 +860,7 @@ export default function ProfileContent({
     setProfSaved(true)
     router.refresh()
     setTimeout(() => setProfSaved(false), 3000)
+    void fetch('/api/cache/invalidate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'taskers:list' }) })
   }
 
   async function savePassword() {
