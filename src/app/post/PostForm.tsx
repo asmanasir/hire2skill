@@ -1374,6 +1374,7 @@ export default function PostForm() {
                   <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
                     {taskImages.map((item, i) => (
                       <div key={`${item.previewUrl}-${i}`} className="relative overflow-hidden rounded-lg border border-gray-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={item.previewUrl} alt={`Task photo ${i + 1}`} className="h-20 w-full object-cover" />
                         <button
                           type="button"

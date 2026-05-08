@@ -890,7 +890,7 @@ export default function DashboardContent({ email, postCount, recentPosts, posted
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [currentUserId, role, router, d.requestDeclinedRealtime, d.requestReceivedRealtime])
+  }, [currentUserId, role, router, d.requestDeclinedRealtime, d.requestReceivedRealtime, d.proposalAcceptedRealtime, d.taskCancelledRealtime])
 
   useEffect(() => {
     if (!incomingRequestToast) return

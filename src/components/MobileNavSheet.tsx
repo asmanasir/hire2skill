@@ -23,8 +23,18 @@ export default function MobileNavSheet({ userEmail, unreadCount, isAdmin = false
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<WinWithPwa['__h2sPwaPrompt'] | null>(null)
-  const [isIos, setIsIos] = useState(false)
-  const [isStandalone, setIsStandalone] = useState(false)
+  // Lazy init — detected once at mount, never changes during component lifetime
+  const [isIos] = useState(() =>
+    typeof window !== 'undefined' &&
+    /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+    !('MSStream' in window)
+  )
+  const [isStandalone] = useState(() =>
+    typeof window !== 'undefined' && (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true
+    )
+  )
   const [showIosHint, setShowIosHint] = useState(false)
 
   useEffect(() => {
@@ -37,15 +47,7 @@ export default function MobileNavSheet({ userEmail, unreadCount, isAdmin = false
   }, [open])
 
   useEffect(() => {
-    const ua = navigator.userAgent
-    const ios = /iphone|ipad|ipod/i.test(ua) && !('MSStream' in window)
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true
-    setIsIos(ios)
-    setIsStandalone(standalone)
-
-    // Pick up prompt if PWARegister already captured it
+    // Pick up prompt if PWARegister already captured it before this mounted
     const existing = (window as WinWithPwa).__h2sPwaPrompt
     if (existing) setInstallPrompt(existing)
 

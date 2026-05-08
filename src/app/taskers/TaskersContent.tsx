@@ -441,7 +441,6 @@ export default function TaskersContent({
   taskers,
   activeCategory,
   citySlug,
-  isSignedIn,
 }: {
   taskers: Tasker[]
   activeCategory: string | null
